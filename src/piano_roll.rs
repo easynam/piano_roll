@@ -8,12 +8,14 @@ use iced::Element;
 use crate::piano_roll::HoverState::{CanDrag, CanResize, OutOfBounds};
 use crate::piano_roll::SequenceChange::{Add, Update, Remove};
 use crate::scroll_zoom::{ScrollZoomState};
+use iced_native::widget::svg::Handle;
+use crate::handles::Handles;
 
 const SELECT_MIN_WIDTH: f32 = 12.0;
 const RESIZE_LEFT: f32 = 8.0;
 const RESIZE_RIGHT: f32 = 8.0;
 const DEFAULT_KEY_HEIGHT: f32 = 20.0;
-const DEFAULT_TICK_WIDTH: f32 = 20.0;
+const DEFAULT_TICK_WIDTH: f32 = 1.0;
 
 pub struct PianoRoll<'a, Message> {
     state: &'a mut State,
@@ -82,7 +84,7 @@ impl<'a, Message> PianoRoll<'a, Message> {
         }
     }
 
-    fn note_select_rect(&self, note: &Note, corner: Point,) -> Rectangle {
+    fn note_rect(&self, note: &Note, corner: Point,) -> Rectangle {
         Rectangle {
             x: note.tick as f32 * self.scroll_zoom_state.scale_x * DEFAULT_TICK_WIDTH + corner.x,
             y: note.note as f32 * self.scroll_zoom_state.scale_y * DEFAULT_KEY_HEIGHT + corner.y,
@@ -92,15 +94,11 @@ impl<'a, Message> PianoRoll<'a, Message> {
     }
 
     fn note_resize_rect(&self, note: &Note, corner: Point,) -> Rectangle {
-        let note_width = note.length as f32 * self.scroll_zoom_state.scale_x;
-        let left_size = RESIZE_LEFT.max((note_width - SELECT_MIN_WIDTH).min(1.0));
+        self.note_rect(note, corner).handle_right()
+    }
 
-        Rectangle {
-            x: (note.tick + note.length) as f32 * self.scroll_zoom_state.scale_x * DEFAULT_TICK_WIDTH - left_size + corner.x,
-            y: note.note as f32 * self.scroll_zoom_state.scale_y * DEFAULT_KEY_HEIGHT + corner.y,
-            width: left_size + RESIZE_RIGHT,
-            height: self.scroll_zoom_state.scale_y * DEFAULT_KEY_HEIGHT,
-        }
+    fn note_resize_rect_l(&self, note: &Note, corner: Point,) -> Rectangle {
+        self.note_rect(note, corner).handle_left()
     }
 }
 
@@ -134,13 +132,12 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                     primitives: self.notes.iter()
                         .map(|note| {
                             Primitive::Quad {
-                                bounds: self.note_select_rect(note, corner),
+                                bounds: self.note_rect(note, corner),
                                 background: Background::Color(Color::from_rgb(1.0, 0.8, 0.4)),
-                                border_radius: 4,
+                                border_radius: 0,
                                 border_width: 1,
                                 border_color: Color::BLACK,
                             }
-
                         })
                         .collect()
                 })
@@ -212,7 +209,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
 
                                 let hovered = self.notes.iter()
                                     .position(|note| {
-                                        self.note_select_rect(note, corner).contains(offset_cursor)
+                                        self.note_rect(note, corner).contains(offset_cursor)
                                     });
 
                                 match resize {
@@ -254,7 +251,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                             let note = Note {
                                 tick: ((offset_cursor.x - corner.x) / (self.scroll_zoom_state.scale_x * DEFAULT_TICK_WIDTH)) as u32,
                                 note: ((offset_cursor.y - corner.y) / (self.scroll_zoom_state.scale_y * DEFAULT_KEY_HEIGHT)) as u8,
-                                length: 2,
+                                length: 40,
                             };
 
                             messages.push( (self.on_change)(Add(note)));

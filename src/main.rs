@@ -17,6 +17,7 @@ mod stack_renderer;
 mod note;
 mod piano_roll;
 mod scroll_zoom;
+mod handles;
 
 pub fn main() {
     App::run(Settings::default())
@@ -70,9 +71,9 @@ impl Sandbox for App {
 
     fn view(&mut self) -> Element<'_, Self::Message> {
         Column::new()
-            .push(Scrollable::new(&mut self.scrollable_1)
-                .push(Container::new(PianoRoll::new(&mut self.piano_roll_1, &self.notes, Sequence, &self.scroll_zoom)).max_height(4000))
-                .max_height(360)
+            .push(Container::new(
+                PianoRoll::new(&mut self.piano_roll_1, &self.notes, Sequence, &self.scroll_zoom))
+                .max_height(4000)
             )
             // .push(Container::new(PianoRoll::new(&mut self.piano_roll_2, &self.notes, Sequence)).max_height(360))
             .into()
