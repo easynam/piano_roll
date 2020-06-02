@@ -7,17 +7,19 @@ use crate::piano_roll::Action::{Dragging, Resizing};
 use iced::Element;
 use crate::piano_roll::HoverState::{CanDrag, CanResize, OutOfBounds};
 use crate::piano_roll::SequenceChange::{Add, Update, Remove};
+use crate::scroll_zoom::{ScrollZoomState};
 
 const SELECT_MIN_WIDTH: f32 = 12.0;
 const RESIZE_LEFT: f32 = 8.0;
 const RESIZE_RIGHT: f32 = 8.0;
+const DEFAULT_KEY_HEIGHT: f32 = 20.0;
+const DEFAULT_TICK_WIDTH: f32 = 20.0;
 
 pub struct PianoRoll<'a, Message> {
     state: &'a mut State,
-    vertical_scale: f32,
-    horizontal_scale: f32,
     notes: &'a Vec<Note>,
     on_change: Box<dyn Fn(SequenceChange) -> Message + 'a>,
+    scroll_zoom_state: &'a ScrollZoomState,
 }
 
 pub struct State {
@@ -68,37 +70,36 @@ pub enum SequenceChange {
 }
 
 impl<'a, Message> PianoRoll<'a, Message> {
-    pub fn new<F>(state: &'a mut State, notes: &'a Vec<Note>, on_change: F) -> Self
+    pub fn new<F>(state: &'a mut State, notes: &'a Vec<Note>, on_change: F, scroll_zoom_state: &'a ScrollZoomState) -> Self
         where
             F: 'a + Fn(SequenceChange) -> Message,
     {
         Self {
             state,
             notes,
-            vertical_scale: 20.0,
-            horizontal_scale: 20.0,
+            scroll_zoom_state,
             on_change: Box::new(on_change),
         }
     }
 
     fn note_select_rect(&self, note: &Note, corner: Point,) -> Rectangle {
         Rectangle {
-            x: note.tick as f32 * self.horizontal_scale + corner.x,
-            y: note.note as f32 * self.vertical_scale + corner.y,
-            width: note.length as f32 * self.horizontal_scale,
-            height: self.vertical_scale,
+            x: note.tick as f32 * self.scroll_zoom_state.scale_x * DEFAULT_TICK_WIDTH + corner.x,
+            y: note.note as f32 * self.scroll_zoom_state.scale_y * DEFAULT_KEY_HEIGHT + corner.y,
+            width: note.length as f32 * self.scroll_zoom_state.scale_x * DEFAULT_TICK_WIDTH,
+            height: self.scroll_zoom_state.scale_y * DEFAULT_KEY_HEIGHT,
         }
     }
 
     fn note_resize_rect(&self, note: &Note, corner: Point,) -> Rectangle {
-        let note_width = note.length as f32 * self.horizontal_scale;
+        let note_width = note.length as f32 * self.scroll_zoom_state.scale_x;
         let left_size = RESIZE_LEFT.max((note_width - SELECT_MIN_WIDTH).min(1.0));
 
         Rectangle {
-            x: (note.tick + note.length) as f32 * self.horizontal_scale - left_size + corner.x,
-            y: note.note as f32 * self.vertical_scale + corner.y,
+            x: (note.tick + note.length) as f32 * self.scroll_zoom_state.scale_x * DEFAULT_TICK_WIDTH - left_size + corner.x,
+            y: note.note as f32 * self.scroll_zoom_state.scale_y * DEFAULT_KEY_HEIGHT + corner.y,
             width: left_size + RESIZE_RIGHT,
-            height: self.vertical_scale,
+            height: self.scroll_zoom_state.scale_y * DEFAULT_KEY_HEIGHT,
         }
     }
 }
@@ -176,8 +177,8 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                                     offset_cursor.y - drag_start.y,
                                 );
 
-                                let x_offset = (offset.x / self.horizontal_scale).round() as i32;
-                                let y_offset = (offset.y / self.vertical_scale).round() as i32;
+                                let x_offset = (offset.x / (self.scroll_zoom_state.scale_x * DEFAULT_TICK_WIDTH)).round() as i32;
+                                let y_offset = (offset.y / (self.scroll_zoom_state.scale_y * DEFAULT_KEY_HEIGHT)).round() as i32;
 
                                 messages.push( (self.on_change)(Update(
                                     note_id,
@@ -191,7 +192,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                         },
                         Resizing(drag_start, note_id, original) => {
                             if let Some(note) = self.notes.get(note_id) {
-                                let x_offset = ((offset_cursor.x - drag_start.x) / self.horizontal_scale).round() as i32;
+                                let x_offset = ((offset_cursor.x - drag_start.x) / (self.scroll_zoom_state.scale_x * DEFAULT_TICK_WIDTH)).round() as i32;
 
                                 messages.push( (self.on_change)(Update(
                                     note_id,
@@ -251,8 +252,8 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                         HoverState::OutOfBounds => {}
                         HoverState::None => {
                             let note = Note {
-                                tick: ((offset_cursor.x - corner.x) / self.horizontal_scale) as u32,
-                                note: ((offset_cursor.y - corner.y) / self.vertical_scale) as u8,
+                                tick: ((offset_cursor.x - corner.x) / (self.scroll_zoom_state.scale_x * DEFAULT_TICK_WIDTH)) as u32,
+                                note: ((offset_cursor.y - corner.y) / (self.scroll_zoom_state.scale_y * DEFAULT_KEY_HEIGHT)) as u8,
                                 length: 2,
                             };
 

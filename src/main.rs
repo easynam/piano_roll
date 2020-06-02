@@ -10,11 +10,13 @@ use crate::piano_roll::{PianoRoll, State, Note, SequenceChange};
 use crate::Message::Sequence;
 use std::fmt::Debug;
 use iced_native::scrollable;
+use crate::scroll_zoom::ScrollZoomState;
 
 mod stack;
 mod stack_renderer;
 mod note;
 mod piano_roll;
+mod scroll_zoom;
 
 pub fn main() {
     App::run(Settings::default())
@@ -23,6 +25,7 @@ pub fn main() {
 struct App {
     scrollable_1: scrollable::State,
     piano_roll_1: piano_roll::State,
+    scroll_zoom: ScrollZoomState,
     piano_roll_2: piano_roll::State,
     notes: Vec<Note>,
 }
@@ -38,8 +41,9 @@ impl Sandbox for App {
     fn new() -> Self {
         App {
             scrollable_1: Default::default(),
-            piano_roll_1: piano_roll::State::default(),
-            piano_roll_2: piano_roll::State::default(),
+            piano_roll_1: piano_roll::State::new(),
+            scroll_zoom: Default::default(),
+            piano_roll_2: piano_roll::State::new(),
             notes: vec!(),
         }
     }
@@ -66,10 +70,11 @@ impl Sandbox for App {
 
     fn view(&mut self) -> Element<'_, Self::Message> {
         Column::new()
-            .push(Scrollable::new(&mut self.scrollable_1).push(
-                Container::new(PianoRoll::new(&mut self.piano_roll_1, &self.notes, Sequence)).max_height(4000)
-            ).max_height(360))
-            .push(Container::new(PianoRoll::new(&mut self.piano_roll_2, &self.notes, Sequence)).max_height(360))
+            .push(Scrollable::new(&mut self.scrollable_1)
+                .push(Container::new(PianoRoll::new(&mut self.piano_roll_1, &self.notes, Sequence, &self.scroll_zoom)).max_height(4000))
+                .max_height(360)
+            )
+            // .push(Container::new(PianoRoll::new(&mut self.piano_roll_2, &self.notes, Sequence)).max_height(360))
             .into()
     }
 }
