@@ -86,10 +86,10 @@ impl<'a, Message> PianoRoll<'a, Message> {
 
     fn note_rect(&self, note: &Note, corner: Point,) -> Rectangle {
         Rectangle {
-            x: note.tick as f32 * self.scroll_zoom_state.scale_x * DEFAULT_TICK_WIDTH + corner.x,
-            y: note.note as f32 * self.scroll_zoom_state.scale_y * DEFAULT_KEY_HEIGHT + corner.y,
-            width: note.length as f32 * self.scroll_zoom_state.scale_x * DEFAULT_TICK_WIDTH,
-            height: self.scroll_zoom_state.scale_y * DEFAULT_KEY_HEIGHT,
+            x: note.tick as f32 * self.scroll_zoom_state.x.scale * DEFAULT_TICK_WIDTH + corner.x,
+            y: note.note as f32 * self.scroll_zoom_state.y.scale * DEFAULT_KEY_HEIGHT + corner.y,
+            width: note.length as f32 * self.scroll_zoom_state.x.scale * DEFAULT_TICK_WIDTH,
+            height: self.scroll_zoom_state.y.scale * DEFAULT_KEY_HEIGHT,
         }
     }
 
@@ -174,8 +174,8 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                                     offset_cursor.y - drag_start.y,
                                 );
 
-                                let x_offset = (offset.x / (self.scroll_zoom_state.scale_x * DEFAULT_TICK_WIDTH)).round() as i32;
-                                let y_offset = (offset.y / (self.scroll_zoom_state.scale_y * DEFAULT_KEY_HEIGHT)).round() as i32;
+                                let x_offset = (offset.x / (self.scroll_zoom_state.x.scale * DEFAULT_TICK_WIDTH)).round() as i32;
+                                let y_offset = (offset.y / (self.scroll_zoom_state.y.scale * DEFAULT_KEY_HEIGHT)).round() as i32;
 
                                 messages.push( (self.on_change)(Update(
                                     note_id,
@@ -189,7 +189,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                         },
                         Resizing(drag_start, note_id, original) => {
                             if let Some(note) = self.notes.get(note_id) {
-                                let x_offset = ((offset_cursor.x - drag_start.x) / (self.scroll_zoom_state.scale_x * DEFAULT_TICK_WIDTH)).round() as i32;
+                                let x_offset = ((offset_cursor.x - drag_start.x) / (self.scroll_zoom_state.x.scale * DEFAULT_TICK_WIDTH)).round() as i32;
 
                                 messages.push( (self.on_change)(Update(
                                     note_id,
@@ -249,8 +249,8 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                         HoverState::OutOfBounds => {}
                         HoverState::None => {
                             let note = Note {
-                                tick: ((offset_cursor.x - corner.x) / (self.scroll_zoom_state.scale_x * DEFAULT_TICK_WIDTH)) as u32,
-                                note: ((offset_cursor.y - corner.y) / (self.scroll_zoom_state.scale_y * DEFAULT_KEY_HEIGHT)) as u8,
+                                tick: ((offset_cursor.x - corner.x) / (self.scroll_zoom_state.x.scale * DEFAULT_TICK_WIDTH)) as u32,
+                                note: ((offset_cursor.y - corner.y) / (self.scroll_zoom_state.y.scale * DEFAULT_KEY_HEIGHT)) as u8,
                                 length: 40,
                             };
 

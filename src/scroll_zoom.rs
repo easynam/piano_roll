@@ -6,20 +6,22 @@ pub struct ScrollZoomControls {
 
 }
 
-pub struct ScrollZoomState {
-    pub scroll_x: f32,
-    pub scroll_y: f32,
-    pub scale_x: f32,
-    pub scale_y: f32,
+pub struct ScrollScaleAxis {
+    pub scroll: f32,
+    pub scale: f32,
 }
 
-impl Default for ScrollZoomState {
+#[derive(Default)]
+pub struct ScrollZoomState {
+    pub x: ScrollScaleAxis,
+    pub y: ScrollScaleAxis,
+}
+
+impl Default for ScrollScaleAxis {
     fn default() -> Self {
-        ScrollZoomState {
-            scroll_x: 0.0,
-            scroll_y: 0.0,
-            scale_x: 1.0,
-            scale_y: 1.0
+        ScrollScaleAxis {
+            scroll: 0.0,
+            scale: 1.0,
         }
     }
 }
