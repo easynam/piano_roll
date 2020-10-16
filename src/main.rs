@@ -7,10 +7,9 @@ use iced_native::Container;
 use std::cmp::{min, max};
 use std::ops::Rem;
 use crate::piano_roll::{PianoRoll, State, Note, SequenceChange};
-use crate::Message::Sequence;
 use std::fmt::Debug;
 use iced_native::scrollable;
-use crate::scroll_zoom::ScrollZoomState;
+use crate::scroll_zoom::{ScrollZoomState, ScrollScaleAxis, ScrollZoomBarX, ScrollScaleAxisChange};
 
 mod stack;
 mod stack_renderer;
@@ -28,12 +27,15 @@ struct App {
     piano_roll_1: piano_roll::State,
     scroll_zoom: ScrollZoomState,
     piano_roll_2: piano_roll::State,
+    scroll_bar: scroll_zoom::ScrollZoomBarState,
+    axis: ScrollScaleAxis,
     notes: Vec<Note>,
 }
 
 #[derive(Debug)]
 enum Message {
-    Sequence(SequenceChange)
+    Sequence(SequenceChange),
+    Scroll(ScrollScaleAxisChange),
 }
 
 impl Sandbox for App {
@@ -45,6 +47,8 @@ impl Sandbox for App {
             piano_roll_1: piano_roll::State::new(),
             scroll_zoom: Default::default(),
             piano_roll_2: piano_roll::State::new(),
+            scroll_bar: scroll_zoom::ScrollZoomBarState::new(),
+            axis: ScrollScaleAxis::default(),
             notes: vec!(),
         }
     }
@@ -66,15 +70,26 @@ impl Sandbox for App {
                     self.notes[idx] = note;
                 },
             },
+            Message::Scroll(scroll) => match scroll {
+                ScrollScaleAxisChange::Scroll(amount) => {
+                    self.axis.scroll = amount
+                },
+                _ => {}
+            }
         }
     }
 
     fn view(&mut self) -> Element<'_, Self::Message> {
         Column::new()
             .push(Container::new(
-                PianoRoll::new(&mut self.piano_roll_1, &self.notes, Sequence, &self.scroll_zoom))
-                .max_height(4000)
+                PianoRoll::new(&mut self.piano_roll_1, &self.notes, Message::Sequence, &self.scroll_zoom))
+                .max_height(700)
             )
+            .push(Container::new(
+                ScrollZoomBarX::new(
+                    &mut self.scroll_bar, &self.axis, Message::Scroll
+                )
+            ))
             // .push(Container::new(PianoRoll::new(&mut self.piano_roll_2, &self.notes, Sequence)).max_height(360))
             .into()
     }
