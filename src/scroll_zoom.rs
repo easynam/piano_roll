@@ -5,6 +5,7 @@ use iced_native::{Widget, Hasher, Layout, Length, Point, MouseCursor, Background
 use iced_native::layout::{Limits, Node};
 use iced_wgpu::{Renderer, Defaults, Primitive};
 use iced_native::input::{mouse, ButtonState};
+use crate::handles::Handles;
 
 pub struct ScrollZoomControls {
 
@@ -63,13 +64,15 @@ enum HoverState {
     None,
     OutOfBounds,
     CanDrag,
-    CanResize,
+    CanResizeRight,
+    CanResizeLeft,
 }
 
 enum Action {
     None,
     Dragging(Point, f32),
-    Resizing(Point, f32),
+    ResizingRight(Point, f32),
+    ResizingLeft(Point, f32),
 }
 
 pub struct ScrollZoomBarX<'a, Message> {
@@ -89,6 +92,10 @@ impl<'a, Message> ScrollZoomBarX<'a, Message> {
             on_change: Box::new(on_change)
         }
     }
+
+    fn bar_width(&self, bounds: &Rectangle ) -> f32 {
+        bounds.x + self.axis.scroll * self.axis.scale
+    }
     
     fn bar_rect(&self, bounds: &Rectangle) -> Rectangle {
         let effective_content_size = f32::max(bounds.width, self.axis.content_size * self.axis.scale);
@@ -98,7 +105,7 @@ impl<'a, Message> ScrollZoomBarX<'a, Message> {
         Rectangle {
             width,
             height: bounds.height,
-            x: bounds.x + self.axis.scroll * self.axis.scale,
+            x: self.bar_width(bounds),
             y: bounds.y,
         }
     }
@@ -147,12 +154,14 @@ impl<'a, Message> Widget<Message, Renderer> for ScrollZoomBarX<'a, Message> {
             },
             match self.state.action {
                 Action::Dragging( .. ) => MouseCursor::Grabbing,
-                Action::Resizing( .. ) => MouseCursor::ResizingHorizontally,
+                Action::ResizingRight( .. ) => MouseCursor::ResizingHorizontally,
+                Action::ResizingLeft( .. ) => MouseCursor::ResizingHorizontally,
                 Action::None => match self.state.hover {
                     HoverState::None => MouseCursor::Idle,
                     HoverState::OutOfBounds => MouseCursor::OutOfBounds,
                     HoverState::CanDrag => MouseCursor::Grab,
-                    HoverState::CanResize => MouseCursor::ResizingHorizontally,
+                    HoverState::CanResizeRight => MouseCursor::ResizingHorizontally,
+                    HoverState::CanResizeLeft => MouseCursor::ResizingHorizontally,
                 }
             },
         )
@@ -170,9 +179,20 @@ impl<'a, Message> Widget<Message, Renderer> for ScrollZoomBarX<'a, Message> {
                     match self.state.action {
                         Action::None => {
                             match layout.bounds().contains(cursor_position) {
-                                true => match self.bar_rect(&layout.bounds()).contains(cursor_position) {
-                                    true => self.state.hover = HoverState::CanDrag,
-                                    false => self.state.hover = HoverState::None,
+                                true => {
+                                    let bar = self.bar_rect(&layout.bounds());
+                                    if bar.handle_right().contains(cursor_position) {
+                                        self.state.hover = HoverState::CanResizeRight
+                                    }
+                                    else if bar.handle_left().contains(cursor_position) {
+                                        self.state.hover = HoverState::CanResizeLeft
+                                    }
+                                    else if bar.contains(cursor_position) {
+                                        self.state.hover = HoverState::CanDrag
+                                    }
+                                    else {
+                                        self.state.hover = HoverState::None
+                                    }
                                 }
                                 false => self.state.hover = HoverState::OutOfBounds
                             }
@@ -180,13 +200,18 @@ impl<'a, Message> Widget<Message, Renderer> for ScrollZoomBarX<'a, Message> {
                         Action::Dragging(from, old_scroll) => {
                             messages.push((self.on_change)(ScrollScaleAxisChange::Scroll(old_scroll + (cursor_position.x - from.x) / self.axis.scale)))
                         }
-                        Action::Resizing(from, old_scale) => {}
+                        Action::ResizingRight(from, old_scale) => {
+                            let offset = (cursor_position.x - from.x);
+                            let bar_width = self.bar_width(&layout.bounds());
+                            messages.push((self.on_change)(ScrollScaleAxisChange::Scale(old_scale * (bar_width / (offset + bar_width)))))
+                        }
+                        _ => {}
                     }
                 }
                 mouse::Event::Input { button: mouse::Button::Left, state: ButtonState::Pressed, } => {
                     match self.state.hover {
                         HoverState::CanDrag => self.state.action = Action::Dragging(cursor_position, self.axis.scroll),
-                        HoverState::CanResize => self.state.action = Action::Resizing(cursor_position, self.axis.scale),
+                        HoverState::CanResizeRight => self.state.action = Action::ResizingRight(cursor_position, self.axis.scale),
                         _ => {}
                     }
                 }
