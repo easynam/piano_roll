@@ -71,8 +71,11 @@ impl Sandbox for App {
                 },
             },
             Message::Scroll(scroll) => match scroll {
-                ScrollScaleAxisChange::Scroll(amount) => {
-                    self.axis.scroll = amount
+                ScrollScaleAxisChange::Left(new_pos) => {
+                    self.axis.view_start = new_pos
+                },
+                ScrollScaleAxisChange::Right(new_pos) => {
+                    self.axis.view_end = new_pos
                 },
                 _ => {}
             }
