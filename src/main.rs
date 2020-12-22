@@ -28,7 +28,6 @@ struct App {
     scroll_zoom: ScrollZoomState,
     piano_roll_2: piano_roll::State,
     scroll_bar: scroll_zoom::ScrollZoomBarState,
-    axis: ScrollScaleAxis,
     notes: Vec<Note>,
 }
 
@@ -48,7 +47,6 @@ impl Sandbox for App {
             scroll_zoom: Default::default(),
             piano_roll_2: piano_roll::State::new(),
             scroll_bar: scroll_zoom::ScrollZoomBarState::new(),
-            axis: ScrollScaleAxis::default(),
             notes: vec!(),
         }
     }
@@ -72,10 +70,10 @@ impl Sandbox for App {
             },
             Message::Scroll(scroll) => match scroll {
                 ScrollScaleAxisChange::Left(new_pos) => {
-                    self.axis.view_start = new_pos
+                    self.scroll_zoom.x.view_start = new_pos
                 },
                 ScrollScaleAxisChange::Right(new_pos) => {
-                    self.axis.view_end = new_pos
+                    self.scroll_zoom.x.view_end = new_pos
                 },
                 _ => {}
             }
@@ -90,7 +88,7 @@ impl Sandbox for App {
             )
             .push(Container::new(
                 ScrollZoomBarX::new(
-                    &mut self.scroll_bar, &self.axis, Message::Scroll
+                    &mut self.scroll_bar, &self.scroll_zoom.x, Message::Scroll
                 )
             ))
             // .push(Container::new(PianoRoll::new(&mut self.piano_roll_2, &self.notes, Sequence)).max_height(360))

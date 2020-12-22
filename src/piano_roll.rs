@@ -86,10 +86,10 @@ impl<'a, Message> PianoRoll<'a, Message> {
 
     fn note_rect(&self, note: &Note, bounds: Rectangle,) -> Rectangle {
         Rectangle {
-            x: note.tick as f32 * self.scroll_zoom_state.x.scale(bounds.width) * DEFAULT_TICK_WIDTH + bounds.x,
-            y: note.note as f32 * self.scroll_zoom_state.y.scale(bounds.width) * DEFAULT_KEY_HEIGHT + bounds.y,
+            x: (note.tick as f32 * DEFAULT_TICK_WIDTH - self.scroll_zoom_state.x.scroll()) * self.scroll_zoom_state.x.scale(bounds.width)  + bounds.x,
+            y: (note.note as f32 * DEFAULT_KEY_HEIGHT - self.scroll_zoom_state.y.scroll()) * self.scroll_zoom_state.y.scale(bounds.height)  + bounds.y,
             width: note.length as f32 * self.scroll_zoom_state.x.scale(bounds.width) * DEFAULT_TICK_WIDTH,
-            height: self.scroll_zoom_state.y.scale(bounds.width) * DEFAULT_KEY_HEIGHT,
+            height: self.scroll_zoom_state.y.scale(bounds.height) * DEFAULT_KEY_HEIGHT,
         }
     }
 
@@ -161,7 +161,10 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
 
     fn on_event(&mut self, _event: Event, layout: Layout<'_>, cursor_position: Point, messages: &mut Vec<Message>, _renderer: &Renderer, _clipboard: Option<&dyn Clipboard>) {
         let bounds = layout.bounds();
-        let offset_cursor = cursor_position; //later will use scroll offset maybe? maybe scroll outside of this widget tho lol
+        let offset_cursor = cursor_position + Vector {
+            x: self.scroll_zoom_state.x.scroll() * self.scroll_zoom_state.x.scale(bounds.width),
+            y: self.scroll_zoom_state.y.scroll() * self.scroll_zoom_state.y.scale(bounds.height)
+        };
         // let corner = Point::new(layout.bounds().x, layout.bounds().y);
 
         match _event {
@@ -176,7 +179,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                                 );
 
                                 let x_offset = (offset.x / (self.scroll_zoom_state.x.scale(bounds.width) * DEFAULT_TICK_WIDTH)).round() as i32;
-                                let y_offset = (offset.y / (self.scroll_zoom_state.y.scale(bounds.width) * DEFAULT_KEY_HEIGHT)).round() as i32;
+                                let y_offset = (offset.y / (self.scroll_zoom_state.y.scale(bounds.height) * DEFAULT_KEY_HEIGHT)).round() as i32;
 
                                 messages.push( (self.on_change)(Update(
                                     note_id,
@@ -205,12 +208,12 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                             if layout.bounds().contains(cursor_position) {
                                 let resize = self.notes.iter()
                                     .position(|note| {
-                                        self.note_resize_rect(note, bounds).contains(offset_cursor)
+                                        self.note_resize_rect(note, bounds).contains(cursor_position)
                                     });
 
                                 let hovered = self.notes.iter()
                                     .position(|note| {
-                                        self.note_rect(note, bounds).contains(offset_cursor)
+                                        self.note_rect(note, bounds).contains(cursor_position)
                                     });
 
                                 match resize {
@@ -251,7 +254,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                         HoverState::None => {
                             let note = Note {
                                 tick: ((offset_cursor.x - bounds.x) / (self.scroll_zoom_state.x.scale(bounds.width) * DEFAULT_TICK_WIDTH)) as u32,
-                                note: ((offset_cursor.y - bounds.y) / (self.scroll_zoom_state.y.scale(bounds.width) * DEFAULT_KEY_HEIGHT)) as u8,
+                                note: ((offset_cursor.y - bounds.y) / (self.scroll_zoom_state.y.scale(bounds.height) * DEFAULT_KEY_HEIGHT)) as u8,
                                 length: 40,
                             };
 

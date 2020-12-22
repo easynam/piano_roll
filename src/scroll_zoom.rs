@@ -25,7 +25,7 @@ impl ScrollScaleAxis {
     }
 
     pub fn scale(&self, bounds_width: f32) -> f32 {
-        (self.view_end - self.view_start) / bounds_width
+        bounds_width / (self.view_end - self.view_start)
     }
 
     pub fn view_width(&self) -> f32 {
