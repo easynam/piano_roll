@@ -92,9 +92,9 @@ enum HoverState {
 
 enum Action {
     None,
-    Dragging(Point, f32, f32),
-    ResizingRight(Point, f32),
-    ResizingLeft(Point, f32),
+    Dragging(Point),
+    ResizingRight(Point),
+    ResizingLeft(Point),
 }
 
 pub struct ScrollZoomBarX<'a, Message> {
@@ -102,6 +102,8 @@ pub struct ScrollZoomBarX<'a, Message> {
     axis: &'a ScrollScaleAxis,
     on_change: Box<dyn Fn(ScrollScaleAxisChange) -> Message + 'a>,
 }
+
+const MIN_SCROLLBAR_SIZE: f32 = 8.0;
 
 impl<'a, Message> ScrollZoomBarX<'a, Message> {
     pub fn new<F>(state: &'a mut ScrollZoomBarState, axis: &'a ScrollScaleAxis, on_change: F) -> Self
@@ -120,14 +122,18 @@ impl<'a, Message> ScrollZoomBarX<'a, Message> {
     // }
     
     fn bar_rect(&self, bounds: &Rectangle) -> Rectangle {
-        // let effective_content_size = f32::max(bounds.width, self.axis.content_size * self.axis.scale);
-        //
-        // let width = bounds.width * (bounds.width / effective_content_size);
+        let mut x = (self.axis.view_start / self.axis.content_size) * bounds.width;
+        let mut width = self.axis.view_proportion() * bounds.width;
+
+        if x > bounds.width - width {
+            x = x.min(bounds.width - MIN_SCROLLBAR_SIZE);
+            width = bounds.width - x;
+        }
 
         Rectangle {
-            width: self.axis.view_proportion() * bounds.width,
+            width,
             height: bounds.height,
-            x: (self.axis.view_start / self.axis.content_size) * bounds.width,
+            x,
             y: bounds.y,
         }
     }
@@ -220,27 +226,37 @@ impl<'a, Message> Widget<Message, Renderer> for ScrollZoomBarX<'a, Message> {
                                 false => self.state.hover = HoverState::OutOfBounds
                             }
                         }
-                        Action::Dragging(from, old_start, old_end) => {
+                        Action::Dragging(ref mut from) => {
                             let offset = (cursor_position.x - from.x);
-                            messages.push((self.on_change)(ScrollScaleAxisChange::Left(old_start + offset * (self.axis.content_size / bounds.width))));
-                            messages.push((self.on_change)(ScrollScaleAxisChange::Right(old_end + offset * (self.axis.content_size / bounds.width))));
+                            *from = cursor_position;
+
+                            let start = self.axis.view_start + offset * (self.axis.content_size / bounds.width);
+                            messages.push((self.on_change)(ScrollScaleAxisChange::Left(start)));
+
+                            let end = self.axis.view_end + offset * (self.axis.content_size / bounds.width);
+                            messages.push((self.on_change)(ScrollScaleAxisChange::Right(end)));
                         }
-                        Action::ResizingRight(from, old_end) => {
+                        Action::ResizingRight(ref mut from) => {
                             let offset = (cursor_position.x - from.x);
-                            messages.push((self.on_change)(ScrollScaleAxisChange::Right(old_end + offset * (self.axis.content_size / bounds.width))));
+                            *from = cursor_position;
+
+                            let end = self.axis.view_end + offset * (self.axis.content_size / bounds.width);
+                            messages.push((self.on_change)(ScrollScaleAxisChange::Right(end)));
                         }
-                        Action::ResizingLeft(from, old_start) => {
+                        Action::ResizingLeft(ref mut from) => {
                             let offset = (cursor_position.x - from.x);
-                            messages.push((self.on_change)(ScrollScaleAxisChange::Left(old_start + offset * (self.axis.content_size / bounds.width))));
+                            *from = cursor_position;
+
+                            let start = self.axis.view_start + offset * (self.axis.content_size / bounds.width);
+                            messages.push((self.on_change)(ScrollScaleAxisChange::Left(start)));
                         }
-                        _ => {}
                     }
                 }
                 mouse::Event::Input { button: mouse::Button::Left, state: ButtonState::Pressed, } => {
                     match self.state.hover {
-                        HoverState::CanDrag => self.state.action = Action::Dragging(cursor_position, self.axis.view_start, self.axis.view_end),
-                        HoverState::CanResizeRight => self.state.action = Action::ResizingRight(cursor_position, self.axis.view_end),
-                        HoverState::CanResizeLeft => self.state.action = Action::ResizingLeft(cursor_position, self.axis.view_start),
+                        HoverState::CanDrag => self.state.action = Action::Dragging(cursor_position),
+                        HoverState::CanResizeRight => self.state.action = Action::ResizingRight(cursor_position),
+                        HoverState::CanResizeLeft => self.state.action = Action::ResizingLeft(cursor_position),
                         _ => {}
                     }
                 }
