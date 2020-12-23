@@ -1,4 +1,4 @@
-use iced::{Element, Settings, Sandbox, Column,};
+use iced::{Element, Settings, Sandbox, Column, Row};
 use iced_native::Container;
 use crate::piano_roll::{PianoRoll, Note, SequenceChange};
 use std::fmt::Debug;

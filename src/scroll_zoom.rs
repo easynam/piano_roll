@@ -1,6 +1,6 @@
 use iced::{Color, Element};
 
-use iced_native::{Widget, Hasher, Layout, Length, Point, MouseCursor, Background, Event, Clipboard, Rectangle};
+use iced_native::{Widget, Hasher, Layout, Length, Point, MouseCursor, Background, Event, Clipboard, Rectangle, Vector};
 use iced_native::layout::{Limits, Node};
 use iced_wgpu::{Renderer, Defaults, Primitive};
 use iced_native::input::{mouse, ButtonState};
@@ -111,7 +111,7 @@ impl<'a, Message> ScrollZoomBarX<'a, Message> {
     }
 
     fn bar_offset(&self, bounds: &Rectangle) -> f32 {
-        (self.axis.view_start / self.axis.content_size) * bounds.width
+        bounds.x + (self.axis.view_start / self.axis.content_size) * bounds.width
     }
 
     fn bar_width(&self, bounds: &Rectangle) -> f32 {
@@ -122,9 +122,9 @@ impl<'a, Message> ScrollZoomBarX<'a, Message> {
         let mut x = self.bar_offset(bounds);
         let mut width = self.bar_width(bounds);
 
-        if x > bounds.width - width {
-            x = x.min(bounds.width - MIN_SCROLLBAR_SIZE);
-            width = bounds.width - x;
+        if x > bounds.x + bounds.width - width {
+            x = x.min(bounds.x + bounds.width - MIN_SCROLLBAR_SIZE);
+            width = bounds.x + bounds.width - x;
         }
 
         Rectangle {
@@ -156,18 +156,20 @@ impl<'a, Message> Widget<Message, Renderer> for ScrollZoomBarX<'a, Message> {
         layout: Layout<'_>,
         _cursor_position: Point,
     ) -> (Primitive, MouseCursor) {
+        let bounds = layout.bounds();
+
         (
             Primitive::Group {
                 primitives: vec![
                     Primitive::Quad {
-                        bounds: layout.bounds(),
+                        bounds,
                         background: Background::Color(Color::from_rgb(0.2, 0.2, 0.2)),
                         border_radius: 0,
                         border_width: 0,
                         border_color: Color::BLACK,
                     },
                     Primitive::Quad {
-                        bounds: self.bar_rect(&layout.bounds()),
+                        bounds: self.bar_rect(&bounds),
                         background: Background::Color(Color::from_rgb(0.8, 0.8, 0.8)),
                         border_radius: 0,
                         border_width: 1,
@@ -196,6 +198,10 @@ impl<'a, Message> Widget<Message, Renderer> for ScrollZoomBarX<'a, Message> {
 
     fn on_event(&mut self, _event: Event, layout: Layout<'_>, cursor_position: Point, messages: &mut Vec<Message>, _renderer: &Renderer, _clipboard: Option<&dyn Clipboard>) {
         let bounds = layout.bounds();
+        let offset_cursor = cursor_position - Vector {
+            x: bounds.x,
+            y: bounds.y,
+        };
 
         match _event {
             Event::Mouse(mouse_event) => match mouse_event {
@@ -222,8 +228,10 @@ impl<'a, Message> Widget<Message, Renderer> for ScrollZoomBarX<'a, Message> {
                             }
                         }
                         Action::Dragging(offset) => {
-                            let mut start = cursor_position.x - offset;
+                            let mut start = offset_cursor.x - offset - bounds.x;
                             let mut end = start + self.bar_width(&bounds);
+
+                            dbg!(offset_cursor.x, start, end);
 
                             if start < 0.0 {
                                 end -= start;
@@ -239,14 +247,14 @@ impl<'a, Message> Widget<Message, Renderer> for ScrollZoomBarX<'a, Message> {
 
                         }
                         Action::ResizingLeft(offset) => {
-                            let mut start = cursor_position.x - offset;
+                            let mut start = offset_cursor.x - offset - bounds.x;
                             if start < 0.0 {
                                 start = 0.0;
                             }
                             messages.push((self.on_change)(ScrollScaleAxisChange::Left(start * self.axis.content_size / bounds.width)));
                         }
                         Action::ResizingRight(offset) => {
-                            let mut end = cursor_position.x - offset;
+                            let mut end = offset_cursor.x - offset - bounds.x;
                             if !self.infinite_scroll && end > bounds.width {
                                 end = bounds.width;
                             }
@@ -256,9 +264,9 @@ impl<'a, Message> Widget<Message, Renderer> for ScrollZoomBarX<'a, Message> {
                 }
                 mouse::Event::Input { button: mouse::Button::Left, state: ButtonState::Pressed, } => {
                     match self.state.hover {
-                        HoverState::CanDrag => self.state.action = Action::Dragging(cursor_position.x - self.bar_offset(&bounds)),
-                        HoverState::CanResizeRight => self.state.action = Action::ResizingRight(cursor_position.x - self.bar_offset(&bounds) - self.bar_width(&bounds)),
-                        HoverState::CanResizeLeft => self.state.action = Action::ResizingLeft(cursor_position.x - self.bar_offset(&bounds)),
+                        HoverState::CanDrag => self.state.action = Action::Dragging(offset_cursor.x - self.bar_offset(&bounds)),
+                        HoverState::CanResizeRight => self.state.action = Action::ResizingRight(offset_cursor.x - self.bar_offset(&bounds) - self.bar_width(&bounds)),
+                        HoverState::CanResizeLeft => self.state.action = Action::ResizingLeft(offset_cursor.x - self.bar_offset(&bounds)),
                         _ => {}
                     }
                 }
