@@ -88,7 +88,7 @@ impl Sandbox for App {
             )
             .push(Container::new(
                 ScrollZoomBarX::new(
-                    &mut self.scroll_bar, &self.scroll_zoom.x, Message::Scroll
+                    &mut self.scroll_bar, &self.scroll_zoom.x, Message::Scroll, true
                 )
             ))
             // .push(Container::new(PianoRoll::new(&mut self.piano_roll_2, &self.notes, Sequence)).max_height(360))
