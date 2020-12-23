@@ -1,15 +1,10 @@
-use iced::{Vector, Color, Element};
+use iced::{Color, Element};
 
-use crate::{handles, Message};
 use iced_native::{Widget, Hasher, Layout, Length, Point, MouseCursor, Background, Event, Clipboard, Rectangle};
 use iced_native::layout::{Limits, Node};
 use iced_wgpu::{Renderer, Defaults, Primitive};
 use iced_native::input::{mouse, ButtonState};
 use crate::handles::Handles;
-
-pub struct ScrollZoomControls {
-
-}
 
 pub struct ScrollScaleAxis {
     pub view_start: f32,
@@ -53,7 +48,7 @@ impl Default for ScrollScaleAxis {
         ScrollScaleAxis {
             view_start: 0.0,
             view_end: 1000.0,
-            content_size: 10000.0,
+            content_size: 2000.0,
         }
     }
 }
@@ -150,7 +145,7 @@ impl<'a, Message> Widget<Message, Renderer> for ScrollZoomBarX<'a, Message> {
         Length::Units(1)
     }
 
-    fn layout(&self, renderer: &Renderer, limits: &Limits) -> Node {
+    fn layout(&self, _renderer: &Renderer, limits: &Limits) -> Node {
         Node::new(limits.max())
     }
 
@@ -159,7 +154,7 @@ impl<'a, Message> Widget<Message, Renderer> for ScrollZoomBarX<'a, Message> {
         _renderer: &mut Renderer,
         _defaults: &Defaults,
         layout: Layout<'_>,
-        cursor_position: Point,
+        _cursor_position: Point,
     ) -> (Primitive, MouseCursor) {
         (
             Primitive::Group {
@@ -195,8 +190,8 @@ impl<'a, Message> Widget<Message, Renderer> for ScrollZoomBarX<'a, Message> {
         )
     }
 
-    fn hash_layout(&self, state: &mut Hasher) {
-        use std::hash::Hash;
+    fn hash_layout(&self, _state: &mut Hasher) {
+        // use std::hash::Hash;
     }
 
     fn on_event(&mut self, _event: Event, layout: Layout<'_>, cursor_position: Point, messages: &mut Vec<Message>, _renderer: &Renderer, _clipboard: Option<&dyn Clipboard>) {
@@ -270,7 +265,6 @@ impl<'a, Message> Widget<Message, Renderer> for ScrollZoomBarX<'a, Message> {
                 mouse::Event::Input { button: mouse::Button::Left, state: ButtonState::Released, } => {
                     self.state.action = Action::None;
                 }
-                mouse::Event::WheelScrolled { delta } => {}
                 _ => {}
             },
             _ => {}

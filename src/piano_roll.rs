@@ -1,4 +1,4 @@
-use iced_native::{Rectangle, Point, Widget, Command, Hasher, Layout, Length, Event, Clipboard, MouseCursor, Background, Color, Size, Vector};
+use iced_native::{Rectangle, Point, Widget, Hasher, Layout, Length, Event, Clipboard, MouseCursor, Background, Color, Vector};
 use iced_native::layout::{Node, Limits};
 use iced_wgpu::{Renderer, Primitive, Defaults};
 use std::cmp::max;
@@ -8,12 +8,8 @@ use iced::Element;
 use crate::piano_roll::HoverState::{CanDrag, CanResize, OutOfBounds};
 use crate::piano_roll::SequenceChange::{Add, Update, Remove};
 use crate::scroll_zoom::{ScrollZoomState};
-use iced_native::widget::svg::Handle;
 use crate::handles::Handles;
 
-const SELECT_MIN_WIDTH: f32 = 12.0;
-const RESIZE_LEFT: f32 = 8.0;
-const RESIZE_RIGHT: f32 = 8.0;
 const DEFAULT_KEY_HEIGHT: f32 = 20.0;
 const DEFAULT_TICK_WIDTH: f32 = 1.0;
 
@@ -96,10 +92,6 @@ impl<'a, Message> PianoRoll<'a, Message> {
     fn note_resize_rect(&self, note: &Note, bounds: Rectangle,) -> Rectangle {
         self.note_rect(note, bounds).handle_right()
     }
-
-    fn note_resize_rect_l(&self, note: &Note, bounds: Rectangle,) -> Rectangle {
-        self.note_rect(note, bounds).handle_left()
-    }
 }
 
 impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
@@ -111,7 +103,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
         Length::Fill
     }
 
-    fn layout(&self, renderer: &Renderer, limits: &Limits) -> Node {
+    fn layout(&self, _renderer: &Renderer, limits: &Limits) -> Node {
         Node::new(limits.max())
     }
 
@@ -120,7 +112,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
         _renderer: &mut Renderer,
         _defaults: &Defaults,
         layout: Layout<'_>,
-        cursor_position: Point,
+        _cursor_position: Point,
     ) -> (Primitive, MouseCursor) {
         let bounds = layout.bounds();
 
@@ -155,8 +147,8 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
         )
     }
 
-    fn hash_layout(&self, state: &mut Hasher) {
-        use std::hash::Hash;
+    fn hash_layout(&self, _state: &mut Hasher) {
+        // use std::hash::Hash;
     }
 
     fn on_event(&mut self, _event: Event, layout: Layout<'_>, cursor_position: Point, messages: &mut Vec<Message>, _renderer: &Renderer, _clipboard: Option<&dyn Clipboard>) {
@@ -169,7 +161,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
 
         match _event {
             Event::Mouse(mouse_event) => match mouse_event {
-                mouse::Event::CursorMoved { x, y } => {
+                mouse::Event::CursorMoved { .. } => {
                     match self.state.action {
                         Dragging(drag_start, note_id, original) => {
                             if let Some(note) = self.notes.get(note_id) {
