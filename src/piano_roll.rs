@@ -9,7 +9,7 @@ use crate::piano_roll::HoverState::{CanDrag, CanResize, OutOfBounds};
 use crate::piano_roll::SequenceChange::{Add, Update, Remove};
 use crate::scroll_zoom::{ScrollZoomState};
 use crate::handles::RectangleHelpers;
-use std::ops::{Rem, Mul};
+use std::ops::{Rem, Mul, Sub, Div};
 
 const DEFAULT_KEY_HEIGHT: f32 = 20.0;
 const DEFAULT_TICK_WIDTH: f32 = 1.0;
@@ -141,6 +141,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
 
         let quantize_width = self.settings.quantize_ticks as f32 * self.scroll_zoom_state.x.scale(bounds.width) * DEFAULT_TICK_WIDTH;
         let quantize_offset = self.scroll_zoom_state.x.scroll().mul(self.scroll_zoom_state.x.scale(bounds.width)).rem(quantize_width);
+        let bar_offset = self.scroll_zoom_state.x.scroll().mul(self.scroll_zoom_state.x.scale(bounds.width)).div(quantize_width) as i32;
 
         for i in 0..=(bounds.width / quantize_width) as i32 + 1 {
             let x = bounds.x + i as f32 * quantize_width - quantize_offset;
@@ -149,14 +150,26 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                 break;
             }
 
+            let colour = if (i + bar_offset) % 4 == 0 {
+                Color::from_rgb(0.1,0.1,0.1)
+            } else {
+                Color::from_rgb(0.2,0.2,0.2)
+            };
+
+            let thickness = if (i + bar_offset) % 16 == 0 {
+                2.0
+            } else {
+                1.0
+            };
+
             lines.push(Primitive::Quad {
                 bounds: Rectangle {
-                    x: x.round(),
+                    x: x.sub(thickness/2.0).round(),
                     y: bounds.y,
-                    width: 1.0,
+                    width: thickness,
                     height: bounds.height
                 },
-                background: Background::Color(Color::from_rgb(0.15,0.15,0.15)),
+                background: Background::Color(colour),
                 border_radius: 0,
                 border_width: 0,
                 border_color: Color::BLACK
@@ -173,7 +186,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                             bounds,
                             background: Background::Color(Color::from_rgb(0.3,0.3,0.3)),
                             border_radius: 0,
-                            border_width: 1,
+                            border_width: 0,
                             border_color: Color::BLACK,
                         },
                         Primitive::Group {
