@@ -1,6 +1,6 @@
 use iced::{Element, Settings, Sandbox, Column};
 use iced_native::Container;
-use crate::piano_roll::{PianoRoll, Note, SequenceChange};
+use crate::piano_roll::{PianoRoll, Note, SequenceChange, PianoRollSettings};
 use std::fmt::Debug;
 use crate::scroll_zoom::{ScrollZoomState, ScrollZoomBarX, ScrollScaleAxisChange};
 
@@ -17,6 +17,7 @@ struct App {
     scroll_zoom: ScrollZoomState,
     scroll_bar: scroll_zoom::ScrollZoomBarState,
     notes: Vec<Note>,
+    settings: PianoRollSettings,
 }
 
 #[derive(Debug)]
@@ -34,6 +35,7 @@ impl Sandbox for App {
             scroll_zoom: Default::default(),
             scroll_bar: scroll_zoom::ScrollZoomBarState::new(),
             notes: vec!(),
+            settings: PianoRollSettings::default(),
         }
     }
 
@@ -69,14 +71,15 @@ impl Sandbox for App {
     fn view(&mut self) -> Element<'_, Self::Message> {
         Column::new()
             .push(Container::new(
-                PianoRoll::new(&mut self.piano_roll_1, &self.notes, Message::Sequence, &self.scroll_zoom))
+                PianoRoll::new(&mut self.piano_roll_1, &self.notes, Message::Sequence, &self.scroll_zoom, &self.settings))
                 .max_height(600)
-            ).padding(10)
+            )
             .push(Container::new(
                 ScrollZoomBarX::new(
                     &mut self.scroll_bar, &self.scroll_zoom.x, Message::Scroll, true
-                )
-            ).padding(40))
+                )).max_height(20)
+            )
+            .padding(20)
             // .push(Container::new(PianoRoll::new(&mut self.piano_roll_2, &self.notes, Sequence)).max_height(360))
             .into()
     }

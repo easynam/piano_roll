@@ -9,6 +9,7 @@ use crate::piano_roll::HoverState::{CanDrag, CanResize, OutOfBounds};
 use crate::piano_roll::SequenceChange::{Add, Update, Remove};
 use crate::scroll_zoom::{ScrollZoomState};
 use crate::handles::RectangleHelpers;
+use std::ops::{Rem, Mul};
 
 const DEFAULT_KEY_HEIGHT: f32 = 20.0;
 const DEFAULT_TICK_WIDTH: f32 = 1.0;
@@ -18,11 +19,24 @@ pub struct PianoRoll<'a, Message> {
     notes: &'a Vec<Note>,
     on_change: Box<dyn Fn(SequenceChange) -> Message + 'a>,
     scroll_zoom_state: &'a ScrollZoomState,
+    settings: &'a PianoRollSettings,
 }
 
 pub struct State {
     action: Action,
     hover: HoverState,
+}
+
+pub struct PianoRollSettings {
+    quantize_ticks: i32,
+}
+
+impl Default for PianoRollSettings {
+    fn default() -> Self {
+        PianoRollSettings {
+            quantize_ticks: 32,
+        }
+    }
 }
 
 enum HoverState {
@@ -68,7 +82,13 @@ pub enum SequenceChange {
 }
 
 impl<'a, Message> PianoRoll<'a, Message> {
-    pub fn new<F>(state: &'a mut State, notes: &'a Vec<Note>, on_change: F, scroll_zoom_state: &'a ScrollZoomState) -> Self
+    pub fn new<F>(
+        state: &'a mut State,
+        notes: &'a Vec<Note>,
+        on_change: F,
+        scroll_zoom_state: &'a ScrollZoomState,
+        settings: &'a PianoRollSettings
+    ) -> Self
         where
             F: 'a + Fn(SequenceChange) -> Message,
     {
@@ -77,6 +97,7 @@ impl<'a, Message> PianoRoll<'a, Message> {
             notes,
             scroll_zoom_state,
             on_change: Box::new(on_change),
+            settings
         }
     }
 
@@ -116,22 +137,56 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
     ) -> (Primitive, MouseCursor) {
         let bounds = layout.bounds();
 
+        let mut lines = vec![];
+
+        let quantize_width = self.settings.quantize_ticks as f32 * self.scroll_zoom_state.x.scale(bounds.width) * DEFAULT_TICK_WIDTH;
+        let quantize_offset = self.scroll_zoom_state.x.scroll().mul(self.scroll_zoom_state.x.scale(bounds.width)).rem(quantize_width);
+
+        for i in 0..=(bounds.width / quantize_width) as i32 {
+            lines.push(Primitive::Quad {
+                bounds: Rectangle {
+                    x: bounds.x + i as f32 * quantize_width - quantize_offset,
+                    y: bounds.y,
+                    width: 1.0,
+                    height: bounds.height
+                },
+                background: Background::Color(Color::from_rgb(0.15,0.15,0.15)),
+                border_radius: 0,
+                border_width: 0,
+                border_color: Color::BLACK
+            })
+        }
+
         (
             Primitive::Clip {
                 bounds: layout.bounds(),
                 offset: Vector::default(),
                 content: Box::new(Primitive::Group {
-                    primitives: self.notes.iter()
-                        .map(|note| {
-                            Primitive::Quad {
-                                bounds: self.note_rect(note, bounds),
-                                background: Background::Color(Color::from_rgb(1.0, 0.8, 0.4)),
-                                border_radius: 0,
-                                border_width: 1,
-                                border_color: Color::BLACK,
-                            }
-                        })
-                        .collect()
+                    primitives: vec![
+                        Primitive::Quad {
+                            bounds,
+                            background: Background::Color(Color::from_rgb(0.3,0.3,0.3)),
+                            border_radius: 0,
+                            border_width: 1,
+                            border_color: Color::BLACK,
+                        },
+                        Primitive::Group {
+                            primitives: lines
+                        },
+                        Primitive::Group {
+                            primitives: self.notes.iter()
+                                .map(|note| {
+                                    Primitive::Quad {
+                                        bounds: self.note_rect(note, bounds),
+                                        background: Background::Color(Color::from_rgb(1.0, 0.8, 0.4)),
+                                        border_radius: 0,
+                                        border_width: 1,
+                                        border_color: Color::BLACK,
+                                    }
+                                })
+                                .collect()
+                        }
+                    ]
                 })
             },
             match self.state.action {
@@ -157,7 +212,6 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
             x: self.scroll_zoom_state.x.scroll() * self.scroll_zoom_state.x.scale(bounds.width),
             y: self.scroll_zoom_state.y.scroll() * self.scroll_zoom_state.y.scale(bounds.height)
         };
-        // let corner = Point::new(layout.bounds().x, layout.bounds().y);
 
         match _event {
             Event::Mouse(mouse_event) => match mouse_event {
