@@ -142,10 +142,16 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
         let quantize_width = self.settings.quantize_ticks as f32 * self.scroll_zoom_state.x.scale(bounds.width) * DEFAULT_TICK_WIDTH;
         let quantize_offset = self.scroll_zoom_state.x.scroll().mul(self.scroll_zoom_state.x.scale(bounds.width)).rem(quantize_width);
 
-        for i in 0..=(bounds.width / quantize_width) as i32 {
+        for i in 0..=(bounds.width / quantize_width) as i32 + 1 {
+            let x = bounds.x + i as f32 * quantize_width - quantize_offset;
+
+            if x > bounds.x + bounds.width {
+                break;
+            }
+
             lines.push(Primitive::Quad {
                 bounds: Rectangle {
-                    x: bounds.x + i as f32 * quantize_width - quantize_offset,
+                    x: x.round(),
                     y: bounds.y,
                     width: 1.0,
                     height: bounds.height
@@ -154,7 +160,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                 border_radius: 0,
                 border_width: 0,
                 border_color: Color::BLACK
-            })
+            });
         }
 
         (
