@@ -1,10 +1,10 @@
 use iced::{Color, Element};
 
-use iced_native::{Widget, Hasher, Layout, Length, Point, MouseCursor, Background, Event, Clipboard, Rectangle, Vector};
+use iced_native::{Widget, Hasher, Layout, Length, Point, MouseCursor, Background, Event, Clipboard, Rectangle};
 use iced_native::layout::{Limits, Node};
 use iced_wgpu::{Renderer, Defaults, Primitive};
 use iced_native::input::{mouse, ButtonState};
-use crate::handles::Handles;
+use crate::handles::{PointHelpers, RectangleHelpers};
 
 pub struct ScrollScaleAxis {
     pub view_start: f32,
@@ -23,6 +23,10 @@ impl ScrollScaleAxis {
 
     pub fn view_width(&self) -> f32 {
         self.view_end - self.view_start
+    }
+
+    pub fn start_proportion(&self) -> f32 {
+        self.view_start / self.content_size
     }
 
     pub fn view_proportion(&self) -> f32 {
@@ -198,10 +202,7 @@ impl<'a, Message> Widget<Message, Renderer> for ScrollZoomBarX<'a, Message> {
 
     fn on_event(&mut self, _event: Event, layout: Layout<'_>, cursor_position: Point, messages: &mut Vec<Message>, _renderer: &Renderer, _clipboard: Option<&dyn Clipboard>) {
         let bounds = layout.bounds();
-        let offset_cursor = cursor_position - Vector {
-            x: bounds.x,
-            y: bounds.y,
-        };
+        let offset_cursor = cursor_position.normalize_within_bounds(&bounds);
 
         match _event {
             Event::Mouse(mouse_event) => match mouse_event {
@@ -210,7 +211,7 @@ impl<'a, Message> Widget<Message, Renderer> for ScrollZoomBarX<'a, Message> {
                         Action::None => {
                             match layout.bounds().contains(cursor_position) {
                                 true => {
-                                    let bar = self.bar_rect(&layout.bounds());
+                                    let bar = self.bar_rect(&bounds);
                                     if bar.handle_right().contains(cursor_position) {
                                         self.state.hover = HoverState::CanResizeRight
                                     }
@@ -228,45 +229,43 @@ impl<'a, Message> Widget<Message, Renderer> for ScrollZoomBarX<'a, Message> {
                             }
                         }
                         Action::Dragging(offset) => {
-                            let mut start = offset_cursor.x - offset - bounds.x;
-                            let mut end = start + self.bar_width(&bounds);
-
-                            dbg!(offset_cursor.x, start, end);
+                            let mut start = offset_cursor.x - offset;
+                            let mut end = start + self.axis.view_proportion();
 
                             if start < 0.0 {
                                 end -= start;
                                 start = 0.0;
                             }
-                            if !self.infinite_scroll && end > bounds.width {
-                                start -= end - bounds.width;
-                                end = bounds.width;
+                            if !self.infinite_scroll && end > 1.0 {
+                                start -= end;
+                                end = 1.0;
                             }
 
-                            messages.push((self.on_change)(ScrollScaleAxisChange::Left(start * (self.axis.content_size / bounds.width))));
-                            messages.push((self.on_change)(ScrollScaleAxisChange::Right(end * (self.axis.content_size / bounds.width))));
+                            messages.push((self.on_change)(ScrollScaleAxisChange::Left(start * self.axis.content_size)));
+                            messages.push((self.on_change)(ScrollScaleAxisChange::Right(end * self.axis.content_size)));
 
                         }
                         Action::ResizingLeft(offset) => {
-                            let mut start = offset_cursor.x - offset - bounds.x;
+                            let mut start = offset_cursor.x - offset;
                             if start < 0.0 {
                                 start = 0.0;
                             }
-                            messages.push((self.on_change)(ScrollScaleAxisChange::Left(start * self.axis.content_size / bounds.width)));
+                            messages.push((self.on_change)(ScrollScaleAxisChange::Left(start * self.axis.content_size)));
                         }
                         Action::ResizingRight(offset) => {
-                            let mut end = offset_cursor.x - offset - bounds.x;
-                            if !self.infinite_scroll && end > bounds.width {
-                                end = bounds.width;
+                            let mut end = offset_cursor.x - offset;
+                            if !self.infinite_scroll && end > 1.0 {
+                                end = 1.0;
                             }
-                            messages.push((self.on_change)(ScrollScaleAxisChange::Right(end * self.axis.content_size / bounds.width)));
+                            messages.push((self.on_change)(ScrollScaleAxisChange::Right(end * self.axis.content_size)));
                         }
                     }
                 }
                 mouse::Event::Input { button: mouse::Button::Left, state: ButtonState::Pressed, } => {
                     match self.state.hover {
-                        HoverState::CanDrag => self.state.action = Action::Dragging(offset_cursor.x - self.bar_offset(&bounds)),
-                        HoverState::CanResizeRight => self.state.action = Action::ResizingRight(offset_cursor.x - self.bar_offset(&bounds) - self.bar_width(&bounds)),
-                        HoverState::CanResizeLeft => self.state.action = Action::ResizingLeft(offset_cursor.x - self.bar_offset(&bounds)),
+                        HoverState::CanDrag => self.state.action = Action::Dragging(offset_cursor.x - self.axis.start_proportion()),
+                        HoverState::CanResizeRight => self.state.action = Action::ResizingRight(offset_cursor.x - self.axis.start_proportion() - self.axis.view_proportion()),
+                        HoverState::CanResizeLeft => self.state.action = Action::ResizingLeft(offset_cursor.x - self.axis.start_proportion()),
                         _ => {}
                     }
                 }

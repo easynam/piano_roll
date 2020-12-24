@@ -1,4 +1,4 @@
-use iced::{Element, Settings, Sandbox, Column, Row};
+use iced::{Element, Settings, Sandbox, Column};
 use iced_native::Container;
 use crate::piano_roll::{PianoRoll, Note, SequenceChange};
 use std::fmt::Debug;
@@ -70,13 +70,13 @@ impl Sandbox for App {
         Column::new()
             .push(Container::new(
                 PianoRoll::new(&mut self.piano_roll_1, &self.notes, Message::Sequence, &self.scroll_zoom))
-                .max_height(700)
-            )
+                .max_height(600)
+            ).padding(10)
             .push(Container::new(
                 ScrollZoomBarX::new(
                     &mut self.scroll_bar, &self.scroll_zoom.x, Message::Scroll, true
                 )
-            ))
+            ).padding(40))
             // .push(Container::new(PianoRoll::new(&mut self.piano_roll_2, &self.notes, Sequence)).max_height(360))
             .into()
     }
