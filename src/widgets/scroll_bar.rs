@@ -3,7 +3,7 @@ use iced_native::{Widget, Hasher, Layout, Length, Point, MouseCursor, Background
 use iced_native::layout::{Limits, Node};
 use iced_wgpu::{Renderer, Defaults, Primitive};
 use iced_native::input::{mouse, ButtonState};
-use crate::handles::{PointHelpers, RectangleHelpers};
+use crate::helpers::{PointHelpers, RectangleHelpers};
 use iced::Element;
 
 pub struct ScrollZoomBarState {

@@ -7,7 +7,7 @@ use crate::widgets::piano_roll::Action::{Dragging, Resizing};
 use iced::Element;
 use crate::widgets::piano_roll::HoverState::{CanDrag, CanResize, OutOfBounds};
 use crate::scroll_zoom::{ScrollZoomState};
-use crate::handles::RectangleHelpers;
+use crate::helpers::RectangleHelpers;
 use std::ops::{Rem, Mul, Sub, Div};
 use crate::sequence::{Note, Sequence, SequenceChange};
 use crate::sequence::SequenceChange::{Update, Add, Remove};

@@ -10,7 +10,7 @@ use widgets::piano_roll;
 mod sequence;
 mod widgets;
 mod scroll_zoom;
-mod handles;
+mod helpers;
 
 pub fn main() {
     App::run(Settings::default())
