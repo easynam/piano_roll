@@ -6,17 +6,18 @@ use iced_native::input::{mouse, ButtonState};
 use crate::piano_roll::Action::{Dragging, Resizing};
 use iced::Element;
 use crate::piano_roll::HoverState::{CanDrag, CanResize, OutOfBounds};
-use crate::piano_roll::SequenceChange::{Add, Update, Remove};
 use crate::scroll_zoom::{ScrollZoomState};
 use crate::handles::RectangleHelpers;
 use std::ops::{Rem, Mul, Sub, Div};
+use crate::sequence::{Note, Sequence, SequenceChange};
+use crate::sequence::SequenceChange::{Update, Add, Remove};
 
 const DEFAULT_KEY_HEIGHT: f32 = 20.0;
 const DEFAULT_TICK_WIDTH: f32 = 1.0;
 
 pub struct PianoRoll<'a, Message> {
     state: &'a mut State,
-    notes: &'a Vec<Note>,
+    notes: &'a Sequence,
     on_change: Box<dyn Fn(SequenceChange) -> Message + 'a>,
     scroll_zoom_state: &'a ScrollZoomState,
     settings: &'a PianoRollSettings,
@@ -65,20 +66,6 @@ impl State {
     pub fn new() -> State {
         State::default()
     }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct Note {
-    tick: u32,
-    note: u8,
-    length: u32,
-}
-
-#[derive(Debug, Clone)]
-pub enum SequenceChange {
-    Add(Note),
-    Remove(usize),
-    Update(usize, Note),
 }
 
 impl<'a, Message> PianoRoll<'a, Message> {

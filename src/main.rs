@@ -1,9 +1,11 @@
 use iced::{Element, Settings, Sandbox, Column};
 use iced_native::Container;
-use crate::piano_roll::{PianoRoll, Note, SequenceChange, PianoRollSettings};
+use crate::piano_roll::{PianoRoll, PianoRollSettings};
 use std::fmt::Debug;
 use crate::scroll_zoom::{ScrollZoomState, ScrollZoomBarX, ScrollScaleAxisChange};
+use crate::sequence::{SequenceChange, Sequence, update_sequence};
 
+mod sequence;
 mod piano_roll;
 mod scroll_zoom;
 mod handles;
@@ -16,7 +18,7 @@ struct App {
     piano_roll_1: piano_roll::State,
     scroll_zoom: ScrollZoomState,
     scroll_bar: scroll_zoom::ScrollZoomBarState,
-    notes: Vec<Note>,
+    notes: Sequence,
     settings: PianoRollSettings,
 }
 
@@ -45,17 +47,7 @@ impl Sandbox for App {
 
     fn update(&mut self, message: Self::Message) {
         match message {
-            Message::Sequence(change) => match change {
-                SequenceChange::Add(note) => {
-                    self.notes.push(note);
-                },
-                SequenceChange::Remove(idx) => {
-                    self.notes.remove(idx);
-                },
-                SequenceChange::Update(idx, note) => {
-                    self.notes[idx] = note;
-                },
-            },
+            Message::Sequence(change) => update_sequence(&mut self.notes, change),
             Message::Scroll(scroll) => match scroll {
                 ScrollScaleAxisChange::Left(new_pos) => {
                     self.scroll_zoom.x.view_start = new_pos
