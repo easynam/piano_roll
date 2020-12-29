@@ -3,9 +3,9 @@ use iced_native::layout::{Node, Limits};
 use iced_wgpu::{Renderer, Primitive, Defaults};
 use std::cmp::max;
 use iced_native::input::{mouse, ButtonState};
-use crate::piano_roll::Action::{Dragging, Resizing};
+use crate::widgets::piano_roll::Action::{Dragging, Resizing};
 use iced::Element;
-use crate::piano_roll::HoverState::{CanDrag, CanResize, OutOfBounds};
+use crate::widgets::piano_roll::HoverState::{CanDrag, CanResize, OutOfBounds};
 use crate::scroll_zoom::{ScrollZoomState};
 use crate::handles::RectangleHelpers;
 use std::ops::{Rem, Mul, Sub, Div};
@@ -16,14 +16,14 @@ const DEFAULT_KEY_HEIGHT: f32 = 20.0;
 const DEFAULT_TICK_WIDTH: f32 = 1.0;
 
 pub struct PianoRoll<'a, Message> {
-    state: &'a mut State,
+    state: &'a mut PianoRollState,
     notes: &'a Sequence,
     on_change: Box<dyn Fn(SequenceChange) -> Message + 'a>,
     scroll_zoom_state: &'a ScrollZoomState,
     settings: &'a PianoRollSettings,
 }
 
-pub struct State {
+pub struct PianoRollState {
     action: Action,
     hover: HoverState,
 }
@@ -53,24 +53,24 @@ enum Action {
     Resizing(Point, usize, Note),
 }
 
-impl Default for State {
+impl Default for PianoRollState {
     fn default() -> Self {
-        State {
+        PianoRollState {
             action: Action::None,
             hover: HoverState::None,
         }
     }
 }
 
-impl State {
-    pub fn new() -> State {
-        State::default()
+impl PianoRollState {
+    pub fn new() -> PianoRollState {
+        PianoRollState::default()
     }
 }
 
 impl<'a, Message> PianoRoll<'a, Message> {
     pub fn new<F>(
-        state: &'a mut State,
+        state: &'a mut PianoRollState,
         notes: &'a Vec<Note>,
         on_change: F,
         scroll_zoom_state: &'a ScrollZoomState,
