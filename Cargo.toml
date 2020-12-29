@@ -1,5 +1,5 @@
 [package]
-name = "icedtest"
+name = "piano_roll"
 version = "0.1.0"
 authors = ["easynam <easynam@gmail.com>"]
 edition = "2018"
