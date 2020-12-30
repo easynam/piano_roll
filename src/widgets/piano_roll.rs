@@ -1,7 +1,7 @@
 use iced_native::{Rectangle, Point, Widget, Hasher, Layout, Length, Event, Clipboard, MouseCursor, Background, Color, Vector};
 use iced_native::layout::{Node, Limits};
 use iced_wgpu::{Renderer, Primitive, Defaults};
-use std::cmp::max;
+use std::{cmp::max, sync::Mutex};
 use iced_native::input::{mouse, ButtonState};
 use crate::widgets::piano_roll::Action::{Dragging, Resizing};
 use iced::Element;
@@ -17,7 +17,7 @@ const DEFAULT_TICK_WIDTH: f32 = 1.0;
 
 pub struct PianoRoll<'a, Message> {
     state: &'a mut PianoRollState,
-    notes: &'a Sequence,
+    notes: &'a Mutex<Sequence>,
     on_change: Box<dyn Fn(SequenceChange) -> Message + 'a>,
     scroll_zoom_state: &'a ScrollZoomState,
     settings: &'a PianoRollSettings,
@@ -71,7 +71,7 @@ impl PianoRollState {
 impl<'a, Message> PianoRoll<'a, Message> {
     pub fn new<F>(
         state: &'a mut PianoRollState,
-        notes: &'a Vec<Note>,
+        notes: &'a Mutex<Vec<Note>>,
         on_change: F,
         scroll_zoom_state: &'a ScrollZoomState,
         settings: &'a PianoRollSettings
@@ -180,7 +180,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                             primitives: lines
                         },
                         Primitive::Group {
-                            primitives: self.notes.iter()
+                            primitives: self.notes.lock().unwrap().iter()
                                 .map(|note| {
                                     Primitive::Quad {
                                         bounds: self.note_rect(note, bounds),
@@ -218,13 +218,14 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
             x: self.scroll_zoom_state.x.scroll() * self.scroll_zoom_state.x.scale(bounds.width),
             y: self.scroll_zoom_state.y.scroll() * self.scroll_zoom_state.y.scale(bounds.height)
         };
+        let notes = self.notes.lock().unwrap();
 
         match _event {
             Event::Mouse(mouse_event) => match mouse_event {
                 mouse::Event::CursorMoved { .. } => {
                     match self.state.action {
                         Dragging(drag_start, note_id, original) => {
-                            if let Some(note) = self.notes.get(note_id) {
+                            if let Some(note) = notes.get(note_id) {
                                 let offset = Point::new(
                                     offset_cursor.x - drag_start.x,
                                     offset_cursor.y - drag_start.y,
@@ -244,7 +245,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                             }
                         },
                         Resizing(drag_start, note_id, original) => {
-                            if let Some(note) = self.notes.get(note_id) {
+                            if let Some(note) = notes.get(note_id) {
                                 let x_offset = ((offset_cursor.x - drag_start.x) / (self.scroll_zoom_state.x.scale(bounds.width) * DEFAULT_TICK_WIDTH)).round() as i32;
 
                                 messages.push( (self.on_change)(Update(
@@ -258,12 +259,12 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                         },
                         Action::None => {
                             if layout.bounds().contains(cursor_position) {
-                                let resize = self.notes.iter()
+                                let resize = notes.iter()
                                     .position(|note| {
                                         self.note_resize_rect(note, bounds).contains(cursor_position)
                                     });
 
-                                let hovered = self.notes.iter()
+                                let hovered = notes.iter()
                                     .position(|note| {
                                         self.note_rect(note, bounds).contains(cursor_position)
                                     });
@@ -311,13 +312,13 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                             };
 
                             messages.push( (self.on_change)(Add(note)));
-                            self.state.action = Dragging(offset_cursor.clone(), self.notes.len(), note);
+                            self.state.action = Dragging(offset_cursor.clone(), notes.len(), note);
                         },
                         CanDrag(idx) => {
-                            self.state.action = Dragging(offset_cursor.clone(), idx, self.notes[idx].clone());
+                            self.state.action = Dragging(offset_cursor.clone(), idx, notes[idx].clone());
                         },
                         CanResize(idx) => {
-                            self.state.action = Resizing(offset_cursor.clone(), idx, self.notes[idx].clone());
+                            self.state.action = Resizing(offset_cursor.clone(), idx, notes[idx].clone());
                         },
                     }
                 }
