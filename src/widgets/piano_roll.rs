@@ -2,7 +2,7 @@ use iced_native::{Rectangle, Point, Widget, Hasher, Layout, Length, Event, Clipb
 use iced_native::layout::{Node, Limits};
 use iced_wgpu::{Renderer, Primitive, Defaults};
 use std::{cmp::max, sync::Mutex};
-use iced_native::input::{mouse, ButtonState};
+use iced_native::input::{mouse, keyboard, ButtonState};
 use crate::widgets::piano_roll::Action::{Dragging, Resizing};
 use iced::Element;
 use crate::widgets::piano_roll::HoverState::{CanDrag, CanResize, OutOfBounds};
@@ -12,6 +12,7 @@ use std::ops::{Rem, Mul, Sub, Div};
 use crate::sequence::{Note, Sequence, SequenceChange};
 use crate::sequence::SequenceChange::{Update, Add, Remove};
 use crate::widgets::barlines::{QuantizeGrid, SimpleGrid, LineType};
+use iced_native::input::keyboard::ModifiersState;
 
 const DEFAULT_KEY_HEIGHT: f32 = 20.0;
 const DEFAULT_TICK_WIDTH: f32 = 1.0;
@@ -27,6 +28,7 @@ pub struct PianoRoll<'a, Message> {
 pub struct PianoRollState {
     action: Action,
     hover: HoverState,
+    modifiers: ModifiersState,
 }
 
 pub struct PianoRollSettings {
@@ -50,6 +52,7 @@ enum HoverState {
 
 enum Action {
     None,
+    Deleting,
     Dragging(Point, usize, Note),
     Resizing(Point, usize, Note),
 }
@@ -59,6 +62,7 @@ impl Default for PianoRollState {
         PianoRollState {
             action: Action::None,
             hover: HoverState::None,
+            modifiers: ModifiersState::default(),
         }
     }
 }
@@ -100,6 +104,65 @@ impl<'a, Message> PianoRoll<'a, Message> {
 
     fn note_resize_rect(&self, note: &Note, bounds: Rectangle,) -> Rectangle {
         self.note_rect(note, bounds).handle_right()
+    }
+
+    fn update_hover(&mut self, layout: Layout, cursor_position: Point, bounds: Rectangle, notes: &Vec<Note>) {
+        if layout.bounds().contains(cursor_position) {
+            let resize = notes.iter()
+                .position(|note| {
+                    self.note_resize_rect(note, bounds).contains(cursor_position)
+                });
+
+            let hovered = notes.iter()
+                .position(|note| {
+                    self.note_rect(note, bounds).contains(cursor_position)
+                });
+
+            match resize {
+                None => {
+                    match hovered {
+                        None => {
+                            self.state.hover = HoverState::None;
+                        }
+                        Some(idx) => {
+                            self.state.hover = CanDrag(idx);
+                        }
+                    }
+                }
+                Some(idx) => {
+                    match hovered {
+                        None => {
+                            self.state.hover = CanResize(idx);
+                        }
+                        Some(hover_idx) => {
+                            if idx == hover_idx {
+                                self.state.hover = CanResize(idx);
+                            } else {
+                                self.state.hover = CanDrag(hover_idx);
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            self.state.hover = OutOfBounds
+        }
+    }
+
+    fn delete_hovered(&mut self, messages: &mut Vec<Message>) {
+        match self.state.hover {
+            HoverState::None => {
+                self.state.action = Action::Deleting;
+            },
+            CanDrag(idx) => {
+                messages.push((self.on_change)(Remove(idx)));
+                self.state.action = Action::Deleting;
+            },
+            CanResize(_) => {
+                self.state.action = Action::Deleting;
+            },
+            _ => {},
+        }
     }
 }
 
@@ -198,7 +261,8 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                     HoverState::OutOfBounds => MouseCursor::OutOfBounds,
                     HoverState::CanDrag(_) => MouseCursor::Grab,
                     HoverState::CanResize(_) => MouseCursor::ResizingHorizontally,
-                }
+                },
+                _ => MouseCursor::Idle,
             },
         )
     }
@@ -207,7 +271,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
         // use std::hash::Hash;
     }
 
-    fn on_event(&mut self, _event: Event, layout: Layout<'_>, cursor_position: Point, messages: &mut Vec<Message>, _renderer: &Renderer, _clipboard: Option<&dyn Clipboard>) {
+    fn on_event(&mut self, event: Event, layout: Layout<'_>, cursor_position: Point, messages: &mut Vec<Message>, _renderer: &Renderer, _clipboard: Option<&dyn Clipboard>) {
         let bounds = layout.bounds();
         let offset_cursor = cursor_position + Vector {
             x: self.scroll_zoom_state.x.scroll() * self.scroll_zoom_state.x.scale(bounds.width),
@@ -215,7 +279,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
         };
         let notes = self.notes.lock().unwrap();
 
-        match _event {
+        match event {
             Event::Mouse(mouse_event) => match mouse_event {
                 mouse::Event::CursorMoved { .. } => {
                     match self.state.action {
@@ -255,47 +319,12 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                                 )));
                             }
                         },
+                        Action::Deleting => {
+                            self.update_hover(layout, cursor_position, bounds, &notes);
+                            self.delete_hovered(messages);
+                        },
                         Action::None => {
-                            if layout.bounds().contains(cursor_position) {
-                                let resize = notes.iter()
-                                    .position(|note| {
-                                        self.note_resize_rect(note, bounds).contains(cursor_position)
-                                    });
-
-                                let hovered = notes.iter()
-                                    .position(|note| {
-                                        self.note_rect(note, bounds).contains(cursor_position)
-                                    });
-
-                                match resize {
-                                    None => {
-                                        match hovered {
-                                            None => {
-                                                self.state.hover = HoverState::None;
-                                            }
-                                            Some(idx) => {
-                                                self.state.hover = CanDrag(idx);
-                                            }
-                                        }
-                                    }
-                                    Some(idx) => {
-                                        match hovered {
-                                            None => {
-                                                self.state.hover = CanResize(idx);
-                                            }
-                                            Some(hover_idx) => {
-                                                if idx == hover_idx {
-                                                    self.state.hover = CanResize(idx);
-                                                } else {
-                                                    self.state.hover = CanDrag(hover_idx);
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            } else {
-                                self.state.hover = OutOfBounds
-                            }
+                            self.update_hover(layout, cursor_position, bounds, &notes);
                         },
                     }
                 }
@@ -324,26 +353,24 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                     }
                 }
                 mouse::Event::Input { button: mouse::Button::Right, state: ButtonState::Pressed, } => {
-                    match self.state.hover {
-                        HoverState::OutOfBounds => {},
-                        HoverState::None => {},
-                        CanDrag(idx) => {
-                            messages.push( (self.on_change)(Remove(idx)));
-                        },
-                        CanResize(idx) => {
-                            messages.push( (self.on_change)(Remove(idx)));
-                        },
-                    }
+                    self.delete_hovered(messages)
                 }
                 mouse::Event::Input { button: mouse::Button::Left, state: ButtonState::Released, } => {
                     self.state.action = Action::None;
                 }
+                mouse::Event::Input { button: mouse::Button::Right, state: ButtonState::Released, } => {
+                    self.state.action = Action::None;
+                }
                 _ => {}
+            }
+            Event::Keyboard(keyboard::Event::Input { modifiers, .. }) => {
+                self.state.modifiers = modifiers;
             }
             _ => {}
         }
     }
 }
+
 
 impl<'a, Message> Into<Element<'a, Message>>
 for PianoRoll<'a, Message>
