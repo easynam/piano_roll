@@ -11,6 +11,7 @@ use crate::helpers::RectangleHelpers;
 use std::ops::{Rem, Mul, Sub, Div};
 use crate::sequence::{Note, Sequence, SequenceChange};
 use crate::sequence::SequenceChange::{Update, Add, Remove};
+use crate::widgets::barlines::{QuantizeGrid, SimpleGrid, LineType};
 
 const DEFAULT_KEY_HEIGHT: f32 = 20.0;
 const DEFAULT_TICK_WIDTH: f32 = 1.0;
@@ -29,13 +30,13 @@ pub struct PianoRollState {
 }
 
 pub struct PianoRollSettings {
-    quantize_ticks: i32,
+    quantize: Box<QuantizeGrid>,
 }
 
 impl Default for PianoRollSettings {
     fn default() -> Self {
         PianoRollSettings {
-            quantize_ticks: 32,
+            quantize: Box::new(SimpleGrid { ticks_per_16th: 32, }),
         }
     }
 }
@@ -124,44 +125,38 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
     ) -> (Primitive, MouseCursor) {
         let bounds = layout.bounds();
 
-        let mut lines = vec![];
+        let grid = self.settings.quantize.get_grid_lines((self.scroll_zoom_state.x.view_start / DEFAULT_TICK_WIDTH) as u32, (self.scroll_zoom_state.x.view_end / DEFAULT_TICK_WIDTH) as u32);
 
-        let quantize_width = self.settings.quantize_ticks as f32 * self.scroll_zoom_state.x.scale(bounds.width) * DEFAULT_TICK_WIDTH;
-        let quantize_offset = self.scroll_zoom_state.x.scroll().mul(self.scroll_zoom_state.x.scale(bounds.width)).rem(quantize_width);
-        let bar_offset = self.scroll_zoom_state.x.scroll().mul(self.scroll_zoom_state.x.scale(bounds.width)).div(quantize_width) as i32;
+        let lines = grid.iter()
+            .map(|line| {
+                let x = line.tick as f32 * DEFAULT_TICK_WIDTH * self.scroll_zoom_state.x.scale(bounds.width);
 
-        for i in 0..=(bounds.width / quantize_width) as i32 + 1 {
-            let x = bounds.x + i as f32 * quantize_width - quantize_offset;
+                let colour = match line.line_type {
+                    LineType::Bar => Color::from_rgb(0.1,0.1,0.1),
+                    LineType::Beat => Color::from_rgb(0.1,0.1,0.1),
+                    LineType::InBetween => Color::from_rgb(0.2,0.2,0.2),
+                };
 
-            if x > bounds.x + bounds.width {
-                break;
-            }
+                let thickness = match line.line_type {
+                    LineType::Bar => 2.0,
+                    LineType::Beat => 1.0,
+                    LineType::InBetween => 1.0,
+                };
 
-            let colour = if (i + bar_offset) % 4 == 0 {
-                Color::from_rgb(0.1,0.1,0.1)
-            } else {
-                Color::from_rgb(0.2,0.2,0.2)
-            };
-
-            let thickness = if (i + bar_offset) % 16 == 0 {
-                2.0
-            } else {
-                1.0
-            };
-
-            lines.push(Primitive::Quad {
-                bounds: Rectangle {
-                    x: x.sub(thickness/2.0).round(),
-                    y: bounds.y,
-                    width: thickness,
-                    height: bounds.height
-                },
-                background: Background::Color(colour),
-                border_radius: 0,
-                border_width: 0,
-                border_color: Color::BLACK
-            });
-        }
+                Primitive::Quad {
+                    bounds: Rectangle {
+                        x: (x - thickness/2.0 - self.scroll_zoom_state.x.view_start * self.scroll_zoom_state.x.scale(bounds.width)).round(),
+                        y: bounds.y,
+                        width: thickness,
+                        height: bounds.height
+                    },
+                    background: Background::Color(colour),
+                    border_radius: 0,
+                    border_width: 0,
+                    border_color: Color::BLACK
+                }
+            })
+            .collect();
 
         (
             Primitive::Clip {
