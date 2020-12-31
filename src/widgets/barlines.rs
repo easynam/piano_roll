@@ -11,6 +11,7 @@ pub struct GridLine {
 
 pub trait QuantizeGrid {
     fn get_grid_lines(&self, start: u32, end: u32) -> Vec<GridLine>;
+    fn quantize_tick(&self, tick: u32) -> u32;
 }
 
 pub struct SimpleGrid {
@@ -29,5 +30,9 @@ impl QuantizeGrid for SimpleGrid {
                 else { LineType::InBetween }
             })
             .collect()
+    }
+
+    fn quantize_tick(&self, tick: u32) -> u32 {
+        return ((tick + self.ticks_per_16th/2) / self.ticks_per_16th) * self.ticks_per_16th;
     }
 }

@@ -145,7 +145,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
 
                 Primitive::Quad {
                     bounds: Rectangle {
-                        x: (x - thickness/2.0 - self.scroll_zoom_state.x.view_start * self.scroll_zoom_state.x.scale(bounds.width)).round(),
+                        x: (x - thickness/2.0 - self.scroll_zoom_state.x.view_start * self.scroll_zoom_state.x.scale(bounds.width) + bounds.x).round(),
                         y: bounds.y,
                         width: thickness,
                         height: bounds.height
@@ -229,10 +229,13 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                                 let x_offset = (offset.x / (self.scroll_zoom_state.x.scale(bounds.width) * DEFAULT_TICK_WIDTH)).round() as i32;
                                 let y_offset = (offset.y / (self.scroll_zoom_state.y.scale(bounds.height) * DEFAULT_KEY_HEIGHT)).round() as i32;
 
+                                let tick = max(0, original.tick as i32 + x_offset) as u32;
+                                let tick = self.settings.quantize.quantize_tick(tick);
+
                                 messages.push( (self.on_change)(Update(
                                     note_id,
                                     Note {
-                                        tick: max(0, original.tick as i32 + x_offset) as u32,
+                                        tick,
                                         note: max(0, original.note as i32 + y_offset) as u8,
                                         ..*note
                                     }
@@ -300,8 +303,11 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                     match self.state.hover {
                         HoverState::OutOfBounds => {}
                         HoverState::None => {
+                            let tick =  ((offset_cursor.x - bounds.x) / (self.scroll_zoom_state.x.scale(bounds.width) * DEFAULT_TICK_WIDTH)) as u32;
+                            let tick = self.settings.quantize.quantize_tick(tick);
+
                             let note = Note {
-                                tick: ((offset_cursor.x - bounds.x) / (self.scroll_zoom_state.x.scale(bounds.width) * DEFAULT_TICK_WIDTH)) as u32,
+                                tick,
                                 note: ((offset_cursor.y - bounds.y) / (self.scroll_zoom_state.y.scale(bounds.height) * DEFAULT_KEY_HEIGHT)) as u8,
                                 length: 40,
                             };
