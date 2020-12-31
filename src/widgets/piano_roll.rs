@@ -8,7 +8,6 @@ use iced::Element;
 use crate::widgets::piano_roll::HoverState::{CanDrag, CanResize, OutOfBounds};
 use crate::scroll_zoom::{ScrollZoomState};
 use crate::helpers::RectangleHelpers;
-use std::ops::{Rem, Mul, Sub, Div};
 use crate::sequence::{Note, Sequence, SequenceChange};
 use crate::sequence::SequenceChange::{Update, Add, Remove};
 use crate::widgets::barlines::{QuantizeGrid, SimpleGrid, LineType};
@@ -32,7 +31,7 @@ pub struct PianoRollState {
 }
 
 pub struct PianoRollSettings {
-    quantize: Box<QuantizeGrid>,
+    quantize: Box<dyn QuantizeGrid>,
 }
 
 impl Default for PianoRollSettings {
