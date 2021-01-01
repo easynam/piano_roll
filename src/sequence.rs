@@ -3,9 +3,9 @@ pub type Sequence = Vec<Note>;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Note {
-    pub(crate) tick: u32,
+    pub(crate) tick: i32,
     pub(crate) note: u8,
-    pub(crate) length: u32,
+    pub(crate) length: i32,
 }
 
 #[derive(Debug, Clone)]
