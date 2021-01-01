@@ -296,7 +296,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
 
                                 let mut tick = max(0, original.tick + x_offset);
                                 if !self.state.modifiers.alt {
-                                    tick = self.settings.quantize.quantize_tick(tick) + quantize_offset;
+                                    tick = self.settings.quantize.quantize_tick(tick - quantize_offset) + quantize_offset;
                                 }
 
                                 messages.push( (self.on_change)(Update(
@@ -337,7 +337,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                         HoverState::None => {
                             let mut tick =  ((offset_cursor.x - bounds.x) / (self.scroll_zoom_state.x.scale(bounds.width) * DEFAULT_TICK_WIDTH)) as i32;
                             if !self.state.modifiers.alt {
-                                tick = self.settings.quantize.quantize_tick(tick);
+                                tick = self.settings.quantize.quantize_tick(tick - quantize_offset) + quantize_offset;
                             }
 
                             let note = Note {
