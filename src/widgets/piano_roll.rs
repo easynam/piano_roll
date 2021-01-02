@@ -3,7 +3,7 @@ use iced_native::layout::{Node, Limits};
 use iced_wgpu::{Renderer, Primitive, Defaults};
 use std::{cmp::max, sync::Mutex};
 use iced_native::input::{mouse, keyboard, ButtonState};
-use crate::widgets::piano_roll::Action::{Dragging, Resizing};
+use crate::widgets::piano_roll::Action::{Dragging, Resizing, Selecting};
 use iced::Element;
 use crate::widgets::piano_roll::HoverState::{CanDrag, CanResize, OutOfBounds};
 use crate::scroll_zoom::{ScrollZoomState};
@@ -12,6 +12,7 @@ use crate::sequence::{Note, Sequence, SequenceChange};
 use crate::sequence::SequenceChange::{Update, Add, Remove};
 use crate::widgets::barlines::{QuantizeGrid, SimpleGrid, LineType};
 use iced_native::input::keyboard::ModifiersState;
+use std::mem::swap;
 
 const DEFAULT_KEY_HEIGHT: f32 = 20.0;
 const DEFAULT_TICK_WIDTH: f32 = 1.0;
@@ -28,6 +29,7 @@ pub struct PianoRollState {
     action: Action,
     hover: HoverState,
     modifiers: ModifiersState,
+    selection: Vec<usize>,
 }
 
 pub struct PianoRollSettings {
@@ -55,6 +57,7 @@ enum Action {
     Deleting,
     Dragging(i32, u8, usize, Note),
     Resizing(i32, usize, Note),
+    Selecting(i32, u8),
 }
 
 impl Default for PianoRollState {
@@ -63,6 +66,7 @@ impl Default for PianoRollState {
             action: Action::None,
             hover: HoverState::None,
             modifiers: ModifiersState::default(),
+            selection: vec![],
         }
     }
 }
@@ -91,6 +95,25 @@ impl<'a, Message> PianoRoll<'a, Message> {
             on_change: Box::new(on_change),
             settings
         }
+    }
+
+    fn selection_rect(&self, mut start_tick: i32, mut start_note: u8, mut end_tick: i32, mut end_note: u8, bounds: &Rectangle) -> Rectangle {
+        if (start_tick > end_tick) {
+            swap(&mut start_tick, &mut end_tick);
+        }
+
+        if (start_note > end_note) {
+            swap(&mut start_note, &mut end_note);
+        }
+
+        let inner = Rectangle {
+            x: start_tick as f32 * DEFAULT_TICK_WIDTH,
+            y: start_note as f32 * DEFAULT_KEY_HEIGHT,
+            width: (end_tick - start_tick + 1) as f32 * DEFAULT_TICK_WIDTH,
+            height: (end_note - start_note + 1) as f32 * DEFAULT_KEY_HEIGHT,
+        };
+
+        self.scroll_zoom_state.inner_rect_to_screen(inner, &bounds)
     }
 
     fn note_rect(&self, note: &Note, bounds: Rectangle,) -> Rectangle {
@@ -184,9 +207,13 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
         _renderer: &mut Renderer,
         _defaults: &Defaults,
         layout: Layout<'_>,
-        _cursor_position: Point,
+        cursor_position: Point,
     ) -> (Primitive, MouseCursor) {
         let bounds = layout.bounds();
+
+        let inner_cursor = self.scroll_zoom_state.screen_to_inner(cursor_position, &bounds);
+        let cursor_tick = (inner_cursor.x / DEFAULT_TICK_WIDTH) as i32;
+        let cursor_note = (inner_cursor.y / DEFAULT_KEY_HEIGHT - 1.0).round() as u8;
 
         let grid = self.settings.quantize.get_grid_lines((self.scroll_zoom_state.x.view_start / DEFAULT_TICK_WIDTH) as i32, (self.scroll_zoom_state.x.view_end / DEFAULT_TICK_WIDTH) as i32);
 
@@ -221,36 +248,50 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
             })
             .collect();
 
+        let mut layers = vec![
+            Primitive::Quad {
+                bounds,
+                background: Background::Color(Color::from_rgb(0.3,0.3,0.3)),
+                border_radius: 0,
+                border_width: 0,
+                border_color: Color::BLACK,
+            },
+            Primitive::Group {
+                primitives: lines
+            },
+            Primitive::Group {
+                primitives: self.notes.lock().unwrap().iter()
+                    .map(|note| {
+                        Primitive::Quad {
+                            bounds: self.note_rect(note, bounds),
+                            background: Background::Color(Color::from_rgb(1.0, 0.8, 0.4)),
+                            border_radius: 0,
+                            border_width: 1,
+                            border_color: Color::BLACK,
+                        }
+                    })
+                    .collect()
+            }
+        ];
+
+        if let Selecting(start_tick, start_note) = self.state.action {
+            layers.push(
+                Primitive::Quad {
+                    bounds: self.selection_rect(start_tick, start_note, cursor_tick, cursor_note, &bounds),
+                    background: Background::Color(Color::TRANSPARENT),
+                    border_radius: 2,
+                    border_width: 2,
+                    border_color: Color::WHITE,
+                }
+            )
+        }
+
         (
             Primitive::Clip {
                 bounds: layout.bounds(),
                 offset: Vector::default(),
                 content: Box::new(Primitive::Group {
-                    primitives: vec![
-                        Primitive::Quad {
-                            bounds,
-                            background: Background::Color(Color::from_rgb(0.3,0.3,0.3)),
-                            border_radius: 0,
-                            border_width: 0,
-                            border_color: Color::BLACK,
-                        },
-                        Primitive::Group {
-                            primitives: lines
-                        },
-                        Primitive::Group {
-                            primitives: self.notes.lock().unwrap().iter()
-                                .map(|note| {
-                                    Primitive::Quad {
-                                        bounds: self.note_rect(note, bounds),
-                                        background: Background::Color(Color::from_rgb(1.0, 0.8, 0.4)),
-                                        border_radius: 0,
-                                        border_width: 1,
-                                        border_color: Color::BLACK,
-                                    }
-                                })
-                                .collect()
-                        }
-                    ]
+                    primitives: layers
                 })
             },
             match self.state.action {
@@ -323,36 +364,40 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                         Action::Deleting => {
                             self.delete_hovered(messages);
                         },
+                        Selecting(_, _) => {}
                         Action::None => { },
                     }
                 }
                 mouse::Event::Input { button: mouse::Button::Left, state: ButtonState::Pressed, } => {
-                    match self.state.hover {
-                        HoverState::OutOfBounds => {}
-                        HoverState::None => {
-                            let mut tick = cursor_tick;
+                    if self.state.modifiers.control {
+                        self.state.action = Selecting(cursor_tick, cursor_note);
+                    } else {
+                        match self.state.hover {
+                            HoverState::OutOfBounds => {}
+                            HoverState::None => {
+                                let mut tick = cursor_tick;
 
-                            if !self.state.modifiers.alt {
-                                tick = self.settings.quantize.quantize_tick(tick);
-                            }
+                                if !self.state.modifiers.alt {
+                                    tick = self.settings.quantize.quantize_tick(tick);
+                                }
 
-                            let note = Note {
-                                tick,
-                                note: cursor_note,
-                                length: 40,
-                            };
+                                let note = Note {
+                                    tick,
+                                    note: cursor_note,
+                                    length: 40,
+                                };
 
-                            messages.push( (self.on_change)(Add(note)));
-                            self.state.action = Dragging(cursor_tick, cursor_note, notes.len(), note);
-                        },
-                        CanDrag(idx) => {
-                            self.state.action = Dragging(cursor_tick, cursor_note, idx, notes[idx].clone());
-                        },
-                        CanResize(idx) => {
-                            self.state.action = Resizing(cursor_tick, idx, notes[idx].clone());
-                        },
-                    }
-                }
+                                messages.push( (self.on_change)(Add(note)));
+                                self.state.action = Dragging(cursor_tick, cursor_note, notes.len(), note);
+                            },
+                            CanDrag(idx) => {
+                                self.state.action = Dragging(cursor_tick, cursor_note, idx, notes[idx].clone());
+                            },
+                            CanResize(idx) => {
+                                self.state.action = Resizing(cursor_tick, idx, notes[idx].clone());
+                            },
+                        }
+                    } }
                 mouse::Event::Input { button: mouse::Button::Right, state: ButtonState::Pressed, } => {
                     self.delete_hovered(messages)
                 }

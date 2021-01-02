@@ -1,4 +1,5 @@
 use iced_native::{Point, Rectangle};
+use crate::helpers::RectangleHelpers;
 
 pub struct ScrollScaleAxis {
     pub view_start: f32,
@@ -30,6 +31,10 @@ impl ScrollScaleAxis {
     pub fn screen_to_inner(&self, pos: f32, bounds_offset: f32, bounds_size: f32) -> f32 {
         pos / self.scale(bounds_size) + self.scroll() - bounds_offset
     }
+
+    pub fn inner_to_screen(&self, pos: f32, bounds_offset: f32, bounds_size: f32) -> f32 {
+        (pos + bounds_offset - self.scroll()) * self.scale(bounds_size)
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -59,7 +64,23 @@ impl ScrollZoomState {
     pub fn screen_to_inner(&self, pos: Point, bounds: &Rectangle) -> Point {
         Point::new(
             self.x.screen_to_inner(pos.x, bounds.x,bounds.width),
+            self.y.screen_to_inner(pos.y, bounds.y,bounds.height),
+        )
+    }
+
+    pub fn inner_to_screen(&self, pos: Point, bounds: &Rectangle) -> Point {
+        Point::new(
+            self.x.screen_to_inner(pos.x, bounds.x,bounds.width),
             self.y.screen_to_inner(pos.y, bounds.y,bounds.height)
         )
+    }
+
+    pub fn inner_rect_to_screen(&self, rect: Rectangle, bounds: &Rectangle) -> Rectangle {
+        Rectangle {
+            x: self.x.inner_to_screen(rect.x, bounds.x,bounds.width),
+            y: self.y.inner_to_screen(rect.y, bounds.y,bounds.height),
+            width: rect.width * self.x.scale(bounds.width),
+            height: rect.height * self.y.scale(bounds.height),
+        }
     }
 }
