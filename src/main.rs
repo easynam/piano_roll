@@ -25,6 +25,7 @@ struct App {
     piano_roll_1: piano_roll::PianoRollState,
     scroll_zoom: ScrollZoomState,
     scroll_bar: ScrollZoomBarState,
+    scroll_bar_2: ScrollZoomBarState,
     notes: Arc<Mutex<Sequence>>,
     settings: PianoRollSettings,
     play_button: button::State,
@@ -36,6 +37,7 @@ struct App {
 enum Message {
     Sequence(SequenceChange),
     Scroll(ScrollScaleAxisChange),
+    Scroll2(ScrollScaleAxisChange),
     Play,
     Stop,
 }
@@ -59,6 +61,7 @@ impl Sandbox for App {
             piano_roll_1: piano_roll::PianoRollState::new(),
             scroll_zoom: Default::default(),
             scroll_bar: ScrollZoomBarState::new(),
+            scroll_bar_2: ScrollZoomBarState::new(),
             notes,
             settings: PianoRollSettings::default(),
             play_button: button::State::new(),
@@ -86,6 +89,15 @@ impl Sandbox for App {
                 },
                 _ => {}
             },
+            Message::Scroll2(scroll) => match scroll {
+                ScrollScaleAxisChange::Left(new_pos) => {
+                    self.scroll_zoom.y.view_start = new_pos
+                },
+                ScrollScaleAxisChange::Right(new_pos) => {
+                    self.scroll_zoom.y.view_end = new_pos
+                },
+                _ => {}
+            },
             Message::Play => {
                 self.synth_channel.try_send(Command::Play);
             },
@@ -103,7 +115,12 @@ impl Sandbox for App {
             )
             .push(Container::new(
                 ScrollZoomBarX::new(
-                    &mut self.scroll_bar, &self.scroll_zoom.x, Message::Scroll, true
+                    &mut self.scroll_bar, &self.scroll_zoom.x, Message::Scroll, false
+                )).max_height(20)
+            )
+            .push(Container::new(
+                ScrollZoomBarX::new(
+                    &mut self.scroll_bar_2, &self.scroll_zoom.y, Message::Scroll2, false
                 )).max_height(20)
             )
             .push(Row::new()

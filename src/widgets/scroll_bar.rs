@@ -186,7 +186,7 @@ impl<'a, Message> Widget<Message, Renderer> for ScrollZoomBarX<'a, Message> {
                                 start = 0.0;
                             }
                             if !self.infinite_scroll && end > 1.0 {
-                                start -= end;
+                                start -= end - 1.0;
                                 end = 1.0;
                             }
 
