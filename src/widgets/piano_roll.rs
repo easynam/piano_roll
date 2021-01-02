@@ -56,8 +56,8 @@ enum HoverState {
 enum Action {
     None,
     Deleting,
-    Dragging(i32, u8, usize, Note),
-    Resizing(i32, usize, Note),
+    Dragging(usize, i32),
+    Resizing(usize, i32),
     Selecting(i32, u8),
 }
 
@@ -346,13 +346,10 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
             Event::Mouse(mouse_event) => match mouse_event {
                 mouse::Event::CursorMoved { .. } => {
                     match self.state.action {
-                        Dragging(start_tick, start_note, note_id, original) => {
+                        Dragging(note_id, drag_offset) => {
                             if let Some(note) = notes.get(note_id) {
-                                let tick_offset = cursor_tick - start_tick;
-                                let note_offset = cursor_note as i32 - start_note as i32;
                                 let quantize_offset = note.tick - self.settings.quantize.quantize_tick(note.tick);
-
-                                let mut tick = max(0, original.tick + tick_offset);
+                                let mut tick = max(0, cursor_tick - drag_offset);
                                 if !self.state.modifiers.alt {
                                     tick = self.settings.quantize.quantize_tick(tick - quantize_offset) + quantize_offset;
                                 }
@@ -361,20 +358,20 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                                     note_id,
                                     Note {
                                         tick,
-                                        note: max(0, original.note as i32 + note_offset) as u8,
+                                        note: max(0, cursor_note) as u8,
                                         ..*note
                                     }
                                 )));
                             }
                         },
-                        Resizing(start_tick, note_id, original) => {
+                        Resizing(note_id, drag_offset) => {
                             if let Some(note) = notes.get(note_id) {
-                                let tick_offset = cursor_tick - start_tick;
+                                let length = cursor_tick - note.tick - drag_offset;
 
                                 messages.push( (self.on_change)(Update(
                                     note_id,
                                     Note {
-                                        length: max(1, original.length + tick_offset),
+                                        length: max(1, length),
                                         ..*note
                                     }
                                 )));
@@ -417,13 +414,15 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                                 };
 
                                 messages.push( (self.on_change)(Add(note)));
-                                self.state.action = Dragging(cursor_tick, cursor_note, notes.len(), note);
+                                self.state.action = Dragging(notes.len(), cursor_tick - tick);
                             },
                             CanDrag(idx) => {
-                                self.state.action = Dragging(cursor_tick, cursor_note, idx, notes[idx].clone());
+                                let note = notes[idx];
+                                self.state.action = Dragging(idx, cursor_tick - note.tick);
                             },
                             CanResize(idx) => {
-                                self.state.action = Resizing(cursor_tick, idx, notes[idx].clone());
+                                let note = notes[idx];
+                                self.state.action = Resizing(idx, cursor_tick - note.tick - note.length);
                             },
                         }
                     } }
