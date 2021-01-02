@@ -49,6 +49,7 @@ enum HoverState {
     CanResize(usize),
 }
 
+#[derive(PartialEq)]
 enum Action {
     None,
     Deleting,
@@ -279,6 +280,8 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
 
         let notes = self.notes.lock().unwrap();
 
+        self.update_hover(layout, cursor_position, bounds, &notes);
+
         match event {
             Event::Mouse(mouse_event) => match mouse_event {
                 mouse::Event::CursorMoved { .. } => {
@@ -318,12 +321,9 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                             }
                         },
                         Action::Deleting => {
-                            self.update_hover(layout, cursor_position, bounds, &notes);
                             self.delete_hovered(messages);
                         },
-                        Action::None => {
-                            self.update_hover(layout, cursor_position, bounds, &notes);
-                        },
+                        Action::None => { },
                     }
                 }
                 mouse::Event::Input { button: mouse::Button::Left, state: ButtonState::Pressed, } => {

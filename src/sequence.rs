@@ -1,7 +1,7 @@
 
 pub type Sequence = Vec<Note>;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Note {
     pub(crate) tick: i32,
     pub(crate) note: u8,
