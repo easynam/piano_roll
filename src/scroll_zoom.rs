@@ -1,3 +1,5 @@
+use iced_native::{Point, Rectangle};
+
 pub struct ScrollScaleAxis {
     pub view_start: f32,
     pub view_end: f32,
@@ -9,8 +11,8 @@ impl ScrollScaleAxis {
         self.view_start
     }
 
-    pub fn scale(&self, bounds_width: f32) -> f32 {
-        bounds_width / (self.view_end - self.view_start)
+    pub fn scale(&self, bounds_size: f32) -> f32 {
+        bounds_size / (self.view_end - self.view_start)
     }
 
     pub fn view_width(&self) -> f32 {
@@ -23,6 +25,10 @@ impl ScrollScaleAxis {
 
     pub fn view_proportion(&self) -> f32 {
         self.view_width() / self.content_size
+    }
+
+    pub fn screen_to_inner(&self, pos: f32, bounds_offset: f32, bounds_size: f32) -> f32 {
+        pos / self.scale(bounds_size) + self.scroll() - bounds_offset
     }
 }
 
@@ -46,5 +52,14 @@ impl Default for ScrollScaleAxis {
             view_end: 1000.0,
             content_size: 2000.0,
         }
+    }
+}
+
+impl ScrollZoomState {
+    pub fn screen_to_inner(&self, pos: Point, bounds: &Rectangle) -> Point {
+        Point::new(
+            self.x.screen_to_inner(pos.x, bounds.x,bounds.width),
+            self.y.screen_to_inner(pos.y, bounds.y,bounds.height)
+        )
     }
 }

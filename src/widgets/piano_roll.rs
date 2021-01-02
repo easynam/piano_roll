@@ -52,8 +52,8 @@ enum HoverState {
 enum Action {
     None,
     Deleting,
-    Dragging(Point, usize, Note),
-    Resizing(Point, usize, Note),
+    Dragging(i32, u8, usize, Note),
+    Resizing(i32, usize, Note),
 }
 
 impl Default for PianoRollState {
@@ -253,13 +253,13 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                 })
             },
             match self.state.action {
-                Dragging(_, _, _) => MouseCursor::Grabbing,
-                Resizing(_, _, _) => MouseCursor::ResizingHorizontally,
+                Dragging( .. ) => MouseCursor::Grabbing,
+                Resizing( .. ) => MouseCursor::ResizingHorizontally,
                 Action::None => match self.state.hover {
                     HoverState::None => MouseCursor::Idle,
                     HoverState::OutOfBounds => MouseCursor::OutOfBounds,
-                    HoverState::CanDrag(_) => MouseCursor::Grab,
-                    HoverState::CanResize(_) => MouseCursor::ResizingHorizontally,
+                    HoverState::CanDrag( .. ) => MouseCursor::Grab,
+                    HoverState::CanResize( .. ) => MouseCursor::ResizingHorizontally,
                 },
                 _ => MouseCursor::Idle,
             },
@@ -272,29 +272,24 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
 
     fn on_event(&mut self, event: Event, layout: Layout<'_>, cursor_position: Point, messages: &mut Vec<Message>, _renderer: &Renderer, _clipboard: Option<&dyn Clipboard>) {
         let bounds = layout.bounds();
-        let offset_cursor = cursor_position + Vector {
-            x: self.scroll_zoom_state.x.scroll() * self.scroll_zoom_state.x.scale(bounds.width),
-            y: self.scroll_zoom_state.y.scroll() * self.scroll_zoom_state.y.scale(bounds.height)
-        };
+
+        let inner_cursor = self.scroll_zoom_state.screen_to_inner(cursor_position, &bounds);
+        let cursor_tick = (inner_cursor.x / DEFAULT_TICK_WIDTH) as i32;
+        let cursor_note =  (inner_cursor.y / DEFAULT_KEY_HEIGHT) as u8;
+
         let notes = self.notes.lock().unwrap();
 
         match event {
             Event::Mouse(mouse_event) => match mouse_event {
                 mouse::Event::CursorMoved { .. } => {
                     match self.state.action {
-                        Dragging(drag_start, note_id, original) => {
+                        Dragging(start_tick, start_note, note_id, original) => {
                             if let Some(note) = notes.get(note_id) {
-                                let offset = Point::new(
-                                    offset_cursor.x - drag_start.x,
-                                    offset_cursor.y - drag_start.y,
-                                );
-
+                                let tick_offset = cursor_tick - start_tick;
+                                let note_offset = cursor_note as i32 - start_note as i32;
                                 let quantize_offset = note.tick - self.settings.quantize.quantize_tick(note.tick);
 
-                                let x_offset = (offset.x / (self.scroll_zoom_state.x.scale(bounds.width) * DEFAULT_TICK_WIDTH)).round() as i32;
-                                let y_offset = (offset.y / (self.scroll_zoom_state.y.scale(bounds.height) * DEFAULT_KEY_HEIGHT)).round() as i32;
-
-                                let mut tick = max(0, original.tick + x_offset);
+                                let mut tick = max(0, original.tick + tick_offset);
                                 if !self.state.modifiers.alt {
                                     tick = self.settings.quantize.quantize_tick(tick - quantize_offset) + quantize_offset;
                                 }
@@ -303,20 +298,20 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                                     note_id,
                                     Note {
                                         tick,
-                                        note: max(0, original.note as i32 + y_offset) as u8,
+                                        note: max(0, original.note as i32 + note_offset) as u8,
                                         ..*note
                                     }
                                 )));
                             }
                         },
-                        Resizing(drag_start, note_id, original) => {
+                        Resizing(start_tick, note_id, original) => {
                             if let Some(note) = notes.get(note_id) {
-                                let x_offset = ((offset_cursor.x - drag_start.x) / (self.scroll_zoom_state.x.scale(bounds.width) * DEFAULT_TICK_WIDTH)).round() as i32;
+                                let tick_offset = cursor_tick - start_tick;
 
                                 messages.push( (self.on_change)(Update(
                                     note_id,
                                     Note {
-                                        length: max(1, original.length + x_offset),
+                                        length: max(1, original.length + tick_offset),
                                         ..*note
                                     }
                                 )));
@@ -335,25 +330,26 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                     match self.state.hover {
                         HoverState::OutOfBounds => {}
                         HoverState::None => {
-                            let mut tick =  ((offset_cursor.x - bounds.x) / (self.scroll_zoom_state.x.scale(bounds.width) * DEFAULT_TICK_WIDTH)) as i32;
+                            let mut tick = cursor_tick;
+
                             if !self.state.modifiers.alt {
-                                tick = self.settings.quantize.quantize_tick(tick - quantize_offset) + quantize_offset;
+                                tick = self.settings.quantize.quantize_tick(tick);
                             }
 
                             let note = Note {
                                 tick,
-                                note: ((offset_cursor.y - bounds.y) / (self.scroll_zoom_state.y.scale(bounds.height) * DEFAULT_KEY_HEIGHT)) as u8,
+                                note: cursor_note,
                                 length: 40,
                             };
 
                             messages.push( (self.on_change)(Add(note)));
-                            self.state.action = Dragging(offset_cursor.clone(), notes.len(), note);
+                            self.state.action = Dragging(cursor_tick, cursor_note, notes.len(), note);
                         },
                         CanDrag(idx) => {
-                            self.state.action = Dragging(offset_cursor.clone(), idx, notes[idx].clone());
+                            self.state.action = Dragging(cursor_tick, cursor_note, idx, notes[idx].clone());
                         },
                         CanResize(idx) => {
-                            self.state.action = Resizing(offset_cursor.clone(), idx, notes[idx].clone());
+                            self.state.action = Resizing(cursor_tick, idx, notes[idx].clone());
                         },
                     }
                 }
