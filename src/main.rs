@@ -2,7 +2,7 @@ use iced::{Element, Settings, Sandbox, Column, Row};
 use iced_native::{Container, Button, Text};
 use widgets::piano_roll::{PianoRoll, PianoRollSettings};
 use std::{fmt::Debug, sync::{Arc, Mutex}};
-use crate::scroll_zoom::{ScrollZoomState, ScrollScaleAxisChange};
+use crate::scroll_zoom::{ScrollZoomState, ScrollScaleAxisChange, ScrollScaleAxis};
 use crate::sequence::{SequenceChange, Sequence, update_sequence};
 use crate::widgets::scroll_bar::{ScrollZoomBarState, ScrollZoomBarX};
 use widgets::piano_roll;
@@ -59,7 +59,10 @@ impl Sandbox for App {
 
         App {
             piano_roll_1: piano_roll::PianoRollState::new(),
-            scroll_zoom: Default::default(),
+            scroll_zoom:ScrollZoomState {
+                x: ScrollScaleAxis::new(0.0,32.0*32.0,32.0*32.0*4.0),
+                y: ScrollScaleAxis::new(0.0, 8.0*20.0, 16.0*20.0),
+            },
             scroll_bar: ScrollZoomBarState::new(),
             scroll_bar_2: ScrollZoomBarState::new(),
             notes,

@@ -8,6 +8,14 @@ pub struct ScrollScaleAxis {
 }
 
 impl ScrollScaleAxis {
+    pub(crate) fn new(view_start: f32, view_size: f32, content_size: f32) -> Self {
+        ScrollScaleAxis {
+            view_start,
+            view_end: view_start + view_size,
+            content_size,
+        }
+    }
+
     pub fn scroll(&self) -> f32 {
         self.view_start
     }
@@ -44,20 +52,9 @@ pub enum ScrollScaleAxisChange {
     Right(f32),
 }
 
-#[derive(Default)]
 pub struct ScrollZoomState {
     pub x: ScrollScaleAxis,
     pub y: ScrollScaleAxis,
-}
-
-impl Default for ScrollScaleAxis {
-    fn default() -> Self {
-        ScrollScaleAxis {
-            view_start: 0.0,
-            view_end: 1000.0,
-            content_size: 2000.0,
-        }
-    }
 }
 
 impl ScrollZoomState {
