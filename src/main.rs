@@ -61,7 +61,7 @@ impl Sandbox for App {
             piano_roll_1: piano_roll::PianoRollState::new(),
             scroll_zoom:ScrollZoomState {
                 x: ScrollScaleAxis::new(0.0,32.0*32.0,32.0*32.0*4.0),
-                y: ScrollScaleAxis::new(0.0, 8.0*20.0, 16.0*20.0),
+                y: ScrollScaleAxis::new(0.0, 24.0*20.0, 60.0*20.0),
             },
             scroll_bar: ScrollZoomBarState::new(),
             scroll_bar_2: ScrollZoomBarState::new(),
@@ -132,7 +132,7 @@ impl Sandbox for App {
                 .push(Button::new(&mut self.stop_button, Text::new("Stop"))
                     .on_press(Message::Stop))
             )
-            .padding(20)
+            .padding(40)
             .into()
     }
 }

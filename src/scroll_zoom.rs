@@ -37,11 +37,11 @@ impl ScrollScaleAxis {
     }
 
     pub fn screen_to_inner(&self, pos: f32, bounds_offset: f32, bounds_size: f32) -> f32 {
-        pos / self.scale(bounds_size) + self.scroll() - bounds_offset
+        (pos - bounds_offset) / self.scale(bounds_size) + self.scroll()
     }
 
     pub fn inner_to_screen(&self, pos: f32, bounds_offset: f32, bounds_size: f32) -> f32 {
-        (pos + bounds_offset - self.scroll()) * self.scale(bounds_size)
+        (pos - self.scroll()) * self.scale(bounds_size) + bounds_offset
     }
 }
 

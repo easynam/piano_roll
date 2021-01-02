@@ -226,7 +226,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
 
         let inner_cursor = self.scroll_zoom_state.screen_to_inner(cursor_position, &bounds);
         let cursor_tick = (inner_cursor.x / DEFAULT_TICK_WIDTH) as i32;
-        let cursor_note = (inner_cursor.y / DEFAULT_KEY_HEIGHT - 1.0).round() as u8;
+        let cursor_note = (inner_cursor.y / DEFAULT_KEY_HEIGHT) as u8;
 
         let grid = self.settings.quantize.get_grid_lines((self.scroll_zoom_state.x.view_start / DEFAULT_TICK_WIDTH) as i32, (self.scroll_zoom_state.x.view_end / DEFAULT_TICK_WIDTH) as i32);
 
@@ -284,7 +284,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                         }
                     })
                     .collect()
-            }
+            },
         ];
 
         if let Selecting(start_tick, start_note) = self.state.action {
@@ -330,7 +330,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
 
         let inner_cursor = self.scroll_zoom_state.screen_to_inner(cursor_position, &bounds);
         let cursor_tick = (inner_cursor.x / DEFAULT_TICK_WIDTH) as i32;
-        let cursor_note = (inner_cursor.y / DEFAULT_KEY_HEIGHT - 1.0).round() as u8;
+        let cursor_note = (inner_cursor.y / DEFAULT_KEY_HEIGHT) as u8;
 
         let notes = self.notes.lock().unwrap();
 
