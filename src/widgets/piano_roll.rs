@@ -372,9 +372,9 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                                 let note_offset = (cursor_note as i32 - note.note as i32).clamp(-min_note, 64 - max_note);
 
                                 // todo: optional mode for irregular grids?
-                                for (other_note_id, note) in selected_notes {
+                                for (note_id, note) in selected_notes {
                                     messages.push( (self.on_change)(Update(
-                                        other_note_id,
+                                        note_id,
                                         Note {
                                             tick: note.tick + tick_offset,
                                             note: (note.note as i32 + note_offset) as u8,
@@ -388,13 +388,27 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                             if let Some(note) = notes.get(note_id) {
                                 let length = cursor_tick - note.tick - drag_offset;
 
-                                messages.push( (self.on_change)(Update(
-                                    note_id,
-                                    Note {
-                                        length: max(1, length),
-                                        ..*note
-                                    }
-                                )));
+                                let mut selected_notes: Vec<(usize, &Note)> = self.state.selection.iter()
+                                    .filter_map(|id| notes.get(*id).map(|note| (*id, note)))
+                                    .collect();
+
+                                if selected_notes.is_empty() {
+                                    selected_notes.push((note_id, &note))
+                                }
+
+                                let min_length = selected_notes.iter().map(|(_, note)| note.length).min().unwrap();
+
+                                let length_offset =  max(-min_length, length - note.length);
+
+                                for (note_id, note) in selected_notes {
+                                    messages.push( (self.on_change)(Update(
+                                        note_id,
+                                        Note {
+                                            length: note.length + length_offset,
+                                            ..*note
+                                        }
+                                    )));
+                                }
                             }
                         },
                         Action::Deleting => {
@@ -435,6 +449,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
 
                                 messages.push( (self.on_change)(Add(note)));
                                 self.state.action = Dragging(notes.len(), cursor_tick - tick);
+                                self.state.selection.clear();
                             },
                             CanDrag(idx) => {
                                 let note = notes[idx];
@@ -446,6 +461,9 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                             CanResize(idx) => {
                                 let note = notes[idx];
                                 self.state.action = Resizing(idx, cursor_tick - note.tick - note.length);
+                                if !self.state.selection.contains(&idx) {
+                                    self.state.selection.clear();
+                                }
                             },
                         }
                     } }
