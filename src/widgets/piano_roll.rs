@@ -354,14 +354,34 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                                     tick = self.settings.quantize.quantize_tick(tick - quantize_offset) + quantize_offset;
                                 }
 
-                                messages.push( (self.on_change)(Update(
-                                    note_id,
-                                    Note {
-                                        tick,
-                                        note: max(0, cursor_note) as u8,
-                                        ..*note
-                                    }
-                                )));
+                                let mut selected_notes: Vec<(usize, &Note)> = self.state.selection.iter()
+                                    .filter_map(|id| notes.get(*id).map(|note| (*id, note)))
+                                    .collect();
+
+                                if selected_notes.is_empty() {
+                                    selected_notes.push((note_id, &note))
+                                }
+
+                                let min_tick = selected_notes.iter().map(|(_, note)| note.tick).min().unwrap();
+
+                                let min_note = selected_notes.iter().map(|(_, note)| note.note).min().unwrap() as i32;
+                                let max_note = selected_notes.iter().map(|(_, note)| note.note).max().unwrap() as i32;
+
+                                let tick_offset = max(-min_tick, tick - note.tick);
+                                // arbitrary max note
+                                let note_offset = (cursor_note as i32 - note.note as i32).clamp(-min_note, 64 - max_note);
+
+                                // todo: optional mode for irregular grids?
+                                for (other_note_id, note) in selected_notes {
+                                    messages.push( (self.on_change)(Update(
+                                        other_note_id,
+                                        Note {
+                                            tick: note.tick + tick_offset,
+                                            note: (note.note as i32 + note_offset) as u8,
+                                            ..*note
+                                        }
+                                    )));
+                                }
                             }
                         },
                         Resizing(note_id, drag_offset) => {
@@ -419,6 +439,9 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                             CanDrag(idx) => {
                                 let note = notes[idx];
                                 self.state.action = Dragging(idx, cursor_tick - note.tick);
+                                if !self.state.selection.contains(&idx) {
+                                    self.state.selection.clear();
+                                }
                             },
                             CanResize(idx) => {
                                 let note = notes[idx];
