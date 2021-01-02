@@ -8,6 +8,12 @@ pub struct Note {
     pub(crate) length: i32,
 }
 
+impl Note {
+    pub fn end_tick(&self) -> i32 {
+        self.tick + self.length
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum SequenceChange {
     Add(Note),

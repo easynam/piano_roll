@@ -13,6 +13,7 @@ use crate::sequence::SequenceChange::{Update, Add, Remove};
 use crate::widgets::barlines::{QuantizeGrid, SimpleGrid, LineType};
 use iced_native::input::keyboard::ModifiersState;
 use std::mem::swap;
+use std::cmp::min;
 
 const DEFAULT_KEY_HEIGHT: f32 = 20.0;
 const DEFAULT_TICK_WIDTH: f32 = 1.0;
@@ -98,11 +99,11 @@ impl<'a, Message> PianoRoll<'a, Message> {
     }
 
     fn selection_rect(&self, mut start_tick: i32, mut start_note: u8, mut end_tick: i32, mut end_note: u8, bounds: &Rectangle) -> Rectangle {
-        if (start_tick > end_tick) {
+        if start_tick > end_tick {
             swap(&mut start_tick, &mut end_tick);
         }
 
-        if (start_note > end_note) {
+        if start_note > end_note {
             swap(&mut start_note, &mut end_note);
         }
 
@@ -273,11 +274,16 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                 primitives: lines
             },
             Primitive::Group {
-                primitives: self.notes.lock().unwrap().iter()
-                    .map(|note| {
+                primitives: self.notes.lock().unwrap().iter().enumerate()
+                    .map(|(id, note)| {
+                        let colour = match self.state.selection.contains(&id) {
+                            true => Color::from_rgb(0.6, 0.9, 1.0),
+                            false => Color::from_rgb(1.0, 0.8, 0.4),
+                        };
+
                         Primitive::Quad {
                             bounds: self.note_rect(note, bounds),
-                            background: Background::Color(Color::from_rgb(1.0, 0.8, 0.4)),
+                            background: Background::Color(colour),
                             border_radius: 0,
                             border_width: 1,
                             border_color: Color::BLACK,
@@ -377,7 +383,17 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                         Action::Deleting => {
                             self.delete_hovered(messages);
                         },
-                        Selecting(_, _) => {}
+                        Selecting(start_tick, start_note) => {
+                            let from_tick = min(start_tick, cursor_tick);
+                            let to_tick = max(start_tick, cursor_tick);
+                            let from_note = min(start_note, cursor_note);
+                            let to_note = max(start_note, cursor_note);
+
+                            self.state.selection = notes.iter().enumerate()
+                                .filter(|(_id, note)| note.tick <= to_tick && note.end_tick() >= from_tick && note.note <= to_note && note.note >= from_note)
+                                .map(|(id, _note)| id)
+                                .collect();
+                        }
                         Action::None => { },
                     }
                 }
