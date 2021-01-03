@@ -21,7 +21,7 @@ impl Player {
             samples_per_tick,
             controller,
             cursor: 0,
-            playing: false,
+            playing: false,  
         }
     }
 
@@ -57,11 +57,11 @@ impl Player {
             let end_sample = start_sample + note.length as usize * self.samples_per_tick;
             if start_sample >= self.cursor && start_sample < cursor_end {
                 self.controller.send_event(Event{
-                    sample: start_sample,
+                    sample: self.start_sample + start_sample,
                     data: EventData::NoteOn(*note),
                 });
                 self.controller.send_event(Event{
-                    sample: end_sample,
+                    sample: self.start_sample + end_sample,
                     data: EventData::NoteOff(*note),
                 });
             }

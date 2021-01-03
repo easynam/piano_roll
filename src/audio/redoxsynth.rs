@@ -79,7 +79,7 @@ impl Source for RedoxSynthSource {
         }
 
         let mut i = 0;
-        for event in self.events.iter() {
+        for event in self.events.iter().filter(|e| e.sample < sample + length) {
             if event.sample > sample + i {
                 let gen_samples = event.sample - (sample + i);
 
@@ -101,7 +101,7 @@ impl Source for RedoxSynthSource {
             }
         }
 
-        self.events.retain(|e| e.sample >= sample);
+        self.events.retain(|e| e.sample >= sample + length);
 
         // TODO: hardcoded channel count
         self.synth.write(&mut data[i * 2..length * 2]).unwrap();

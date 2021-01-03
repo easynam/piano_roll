@@ -49,7 +49,7 @@ impl Synth {
                 }
             }
             thread::sleep(Duration::from_millis(10));
-            player.process(emitter.get_sample_pos() + 1000);
+            player.process(emitter.get_sample_pos() + 4800);
         }
     }
 }
