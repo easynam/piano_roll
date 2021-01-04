@@ -14,7 +14,7 @@ use crate::widgets::barlines::{QuantizeGrid, SimpleGrid, LineType};
 use iced_native::input::keyboard::ModifiersState;
 use std::cmp::min;
 
-const DEFAULT_KEY_HEIGHT: f32 = 20.0;
+const DEFAULT_OCTAVE_HEIGHT: f32 = 200.0;
 const DEFAULT_TICK_WIDTH: f32 = 1.0;
 
 pub struct PianoRoll<'a, Message> {
@@ -105,9 +105,9 @@ impl<'a, Message> PianoRoll<'a, Message> {
 
         let inner = Rectangle {
             x: from_tick as f32 * DEFAULT_TICK_WIDTH,
-            y: from_note.to_f32() * DEFAULT_KEY_HEIGHT * 12.0,
+            y: from_note.to_f32() * DEFAULT_OCTAVE_HEIGHT,
             width: (to_tick - from_tick + 1) as f32 * DEFAULT_TICK_WIDTH,
-            height: (to_note.clone() - from_note.clone() + Pitch::new(1, 12)).to_f32() * DEFAULT_KEY_HEIGHT * 12.0,
+            height: (to_note.clone() - from_note.clone() + Pitch::new(1, 12)).to_f32() * DEFAULT_OCTAVE_HEIGHT,
         };
 
         self.scroll_zoom_state.inner_rect_to_screen(inner, &bounds)
@@ -129,9 +129,9 @@ impl<'a, Message> PianoRoll<'a, Message> {
     fn note_rect(&self, note: &Note, bounds: Rectangle,) -> Rectangle {
         Rectangle {
             x: (note.tick as f32 * DEFAULT_TICK_WIDTH - self.scroll_zoom_state.x.scroll()) * self.scroll_zoom_state.x.scale(bounds.width) + bounds.x,
-            y: (note.pitch.to_f32() * DEFAULT_KEY_HEIGHT * 12.0 - self.scroll_zoom_state.y.scroll()) * self.scroll_zoom_state.y.scale(bounds.height) + bounds.y,
+            y: (note.pitch.to_f32() * DEFAULT_OCTAVE_HEIGHT - self.scroll_zoom_state.y.scroll()) * self.scroll_zoom_state.y.scale(bounds.height) + bounds.y,
             width: note.length as f32 * self.scroll_zoom_state.x.scale(bounds.width) * DEFAULT_TICK_WIDTH,
-            height: self.scroll_zoom_state.y.scale(bounds.height) * DEFAULT_KEY_HEIGHT,
+            height: self.scroll_zoom_state.y.scale(bounds.height) * DEFAULT_OCTAVE_HEIGHT / 12.0,
         }
     }
 
@@ -223,7 +223,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
 
         let inner_cursor = self.scroll_zoom_state.screen_to_inner(cursor_position, &bounds);
         let cursor_tick = (inner_cursor.x / DEFAULT_TICK_WIDTH) as i32;
-        let cursor_note = Pitch::new((inner_cursor.y / DEFAULT_KEY_HEIGHT) as i32, 12);
+        let cursor_note = Pitch::new((12.0 * inner_cursor.y / DEFAULT_OCTAVE_HEIGHT).floor() as i32, 12);
 
         let grid = self.settings.quantize.get_grid_lines((self.scroll_zoom_state.x.view_start / DEFAULT_TICK_WIDTH) as i32, (self.scroll_zoom_state.x.view_end / DEFAULT_TICK_WIDTH) as i32);
 
@@ -332,7 +332,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
 
         let inner_cursor = self.scroll_zoom_state.screen_to_inner(cursor_position, &bounds);
         let cursor_tick = (inner_cursor.x / DEFAULT_TICK_WIDTH) as i32;
-        let cursor_note = Pitch::new((inner_cursor.y / DEFAULT_KEY_HEIGHT) as i32, 12);
+        let cursor_note = Pitch::new((12.0 * inner_cursor.y / DEFAULT_OCTAVE_HEIGHT).floor() as i32, 12);
 
         let notes = self.notes.lock().unwrap();
 
@@ -365,7 +365,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
 
                                 let tick_offset = max(-min_tick, tick - note.tick);
                                 // arbitrary max note
-                                let note_offset = (cursor_note - note.pitch.clone()).clamp(-min_note, Pitch::new(8, 1) - max_note);
+                                let note_offset = (cursor_note - note.pitch.clone()).clamp(Pitch::new(-4, 1) - min_note, Pitch::new(47, 12) - max_note);
 
                                 // todo: optional mode for irregular grids?
                                 for (note_id, note) in selected_notes {
@@ -440,7 +440,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                                 let note = Note {
                                     tick,
                                     pitch: cursor_note.clone(),
-                                    length: 40,
+                                    length: 32,
                                 };
 
                                 messages.push( (self.on_change)(Add(note)));
@@ -464,6 +464,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                         }
                     } }
                 mouse::Event::Input { button: mouse::Button::Right, state: ButtonState::Pressed, } => {
+                    //TODO prevent doubling up on deletes
                     self.delete_hovered(messages)
                 }
                 mouse::Event::Input { button: mouse::Button::Left, state: ButtonState::Released, } => {

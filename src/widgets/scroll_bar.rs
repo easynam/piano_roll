@@ -64,7 +64,7 @@ impl<'a, Message> ScrollZoomBarX<'a, Message> {
     }
 
     fn bar_offset(&self, bounds: &Rectangle) -> f32 {
-        bounds.x + (self.axis.view_start / self.axis.content_size) * bounds.width
+        bounds.x + ((self.axis.view_start - self.axis.content_start) / self.axis.content_size) * bounds.width
     }
 
     fn bar_width(&self, bounds: &Rectangle) -> f32 {
@@ -190,8 +190,8 @@ impl<'a, Message> Widget<Message, Renderer> for ScrollZoomBarX<'a, Message> {
                                 end = 1.0;
                             }
 
-                            messages.push((self.on_change)(ScrollScaleAxisChange::Left(start * self.axis.content_size)));
-                            messages.push((self.on_change)(ScrollScaleAxisChange::Right(end * self.axis.content_size)));
+                            messages.push((self.on_change)(ScrollScaleAxisChange::Left(start * self.axis.content_size + self.axis.content_start)));
+                            messages.push((self.on_change)(ScrollScaleAxisChange::Right(end * self.axis.content_size + self.axis.content_start)));
 
                         }
                         Action::ResizingLeft(offset) => {
@@ -199,14 +199,14 @@ impl<'a, Message> Widget<Message, Renderer> for ScrollZoomBarX<'a, Message> {
                             if start < 0.0 {
                                 start = 0.0;
                             }
-                            messages.push((self.on_change)(ScrollScaleAxisChange::Left(start * self.axis.content_size)));
+                            messages.push((self.on_change)(ScrollScaleAxisChange::Left(start * self.axis.content_size + self.axis.content_start)));
                         }
                         Action::ResizingRight(offset) => {
                             let mut end = offset_cursor.x - offset;
                             if !self.infinite_scroll && end > 1.0 {
                                 end = 1.0;
                             }
-                            messages.push((self.on_change)(ScrollScaleAxisChange::Right(end * self.axis.content_size)));
+                            messages.push((self.on_change)(ScrollScaleAxisChange::Right(end * self.axis.content_size + self.axis.content_start)));
                         }
                     }
                 }

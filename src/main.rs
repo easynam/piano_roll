@@ -60,8 +60,8 @@ impl Sandbox for App {
         App {
             piano_roll_1: piano_roll::PianoRollState::new(),
             scroll_zoom:ScrollZoomState {
-                x: ScrollScaleAxis::new(0.0,32.0*32.0,32.0*32.0*4.0),
-                y: ScrollScaleAxis::new(0.0, 24.0*20.0, 60.0*20.0),
+                x: ScrollScaleAxis::new(0.0,32.0*32.0, 0.0, 32.0*32.0*4.0),
+                y: ScrollScaleAxis::new(-1.5*200.0, 3.0*200.0, -4.0*200.0, 8.0*200.0),
             },
             scroll_bar: ScrollZoomBarState::new(),
             scroll_bar_2: ScrollZoomBarState::new(),
