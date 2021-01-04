@@ -1,5 +1,4 @@
 use iced_native::{Point, Rectangle};
-use crate::helpers::RectangleHelpers;
 
 pub struct ScrollScaleAxis {
     pub view_start: f32,
@@ -67,8 +66,8 @@ impl ScrollZoomState {
 
     pub fn inner_to_screen(&self, pos: Point, bounds: &Rectangle) -> Point {
         Point::new(
-            self.x.screen_to_inner(pos.x, bounds.x,bounds.width),
-            self.y.screen_to_inner(pos.y, bounds.y,bounds.height)
+            self.x.inner_to_screen(pos.x, bounds.x,bounds.width),
+            self.y.inner_to_screen(pos.y, bounds.y,bounds.height)
         )
     }
 

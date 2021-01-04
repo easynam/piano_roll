@@ -91,12 +91,12 @@ impl Source for RedoxSynthSource {
                 i += gen_samples;
             }
 
-            match event.data {
+            match &event.data {
                 EventData::NoteOn(n) => {
-                    self.synth.note_on(0, 96 - n.note as u32, 127);
+                    self.synth.note_on(0, n.pitch.midi_pitch(), 127);
                 }
                 EventData::NoteOff(n) => {
-                    self.synth.note_off(0, 96 - n.note as u32);
+                    self.synth.note_off(0, n.pitch.midi_pitch());
                 }
             }
         }

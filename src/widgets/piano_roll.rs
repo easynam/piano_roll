@@ -8,11 +8,10 @@ use iced::Element;
 use crate::widgets::piano_roll::HoverState::{CanDrag, CanResize, OutOfBounds};
 use crate::scroll_zoom::{ScrollZoomState};
 use crate::helpers::RectangleHelpers;
-use crate::sequence::{Note, Sequence, SequenceChange};
+use crate::sequence::{Note, Sequence, SequenceChange, Pitch};
 use crate::sequence::SequenceChange::{Update, Add, Remove};
 use crate::widgets::barlines::{QuantizeGrid, SimpleGrid, LineType};
 use iced_native::input::keyboard::ModifiersState;
-use std::mem::swap;
 use std::cmp::min;
 
 const DEFAULT_KEY_HEIGHT: f32 = 20.0;
@@ -58,7 +57,7 @@ enum Action {
     Deleting,
     Dragging(usize, i32),
     Resizing(usize, i32),
-    Selecting(i32, u8),
+    Selecting(i32, Pitch),
 }
 
 impl Default for PianoRollState {
@@ -98,20 +97,17 @@ impl<'a, Message> PianoRoll<'a, Message> {
         }
     }
 
-    fn selection_rect(&self, mut start_tick: i32, mut start_note: u8, mut end_tick: i32, mut end_note: u8, bounds: &Rectangle) -> Rectangle {
-        if start_tick > end_tick {
-            swap(&mut start_tick, &mut end_tick);
-        }
-
-        if start_note > end_note {
-            swap(&mut start_note, &mut end_note);
-        }
+    fn selection_rect(&self, start_tick: i32, start_note: &Pitch, end_tick: i32, end_note: &Pitch, bounds: &Rectangle) -> Rectangle {
+        let from_tick = min(start_tick, end_tick);
+        let to_tick = max(start_tick, end_tick);
+        let from_note = min(start_note, end_note);
+        let to_note = max(start_note, end_note);
 
         let inner = Rectangle {
-            x: start_tick as f32 * DEFAULT_TICK_WIDTH,
-            y: start_note as f32 * DEFAULT_KEY_HEIGHT,
-            width: (end_tick - start_tick + 1) as f32 * DEFAULT_TICK_WIDTH,
-            height: (end_note - start_note + 1) as f32 * DEFAULT_KEY_HEIGHT,
+            x: from_tick as f32 * DEFAULT_TICK_WIDTH,
+            y: from_note.to_f32() * DEFAULT_KEY_HEIGHT * 12.0,
+            width: (to_tick - from_tick + 1) as f32 * DEFAULT_TICK_WIDTH,
+            height: (to_note.clone() - from_note.clone() + Pitch::new(1, 12)).to_f32() * DEFAULT_KEY_HEIGHT * 12.0,
         };
 
         self.scroll_zoom_state.inner_rect_to_screen(inner, &bounds)
@@ -133,7 +129,7 @@ impl<'a, Message> PianoRoll<'a, Message> {
     fn note_rect(&self, note: &Note, bounds: Rectangle,) -> Rectangle {
         Rectangle {
             x: (note.tick as f32 * DEFAULT_TICK_WIDTH - self.scroll_zoom_state.x.scroll()) * self.scroll_zoom_state.x.scale(bounds.width) + bounds.x,
-            y: (note.note as f32 * DEFAULT_KEY_HEIGHT - self.scroll_zoom_state.y.scroll()) * self.scroll_zoom_state.y.scale(bounds.height) + bounds.y,
+            y: (note.pitch.to_f32() * DEFAULT_KEY_HEIGHT * 12.0 - self.scroll_zoom_state.y.scroll()) * self.scroll_zoom_state.y.scale(bounds.height) + bounds.y,
             width: note.length as f32 * self.scroll_zoom_state.x.scale(bounds.width) * DEFAULT_TICK_WIDTH,
             height: self.scroll_zoom_state.y.scale(bounds.height) * DEFAULT_KEY_HEIGHT,
         }
@@ -227,7 +223,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
 
         let inner_cursor = self.scroll_zoom_state.screen_to_inner(cursor_position, &bounds);
         let cursor_tick = (inner_cursor.x / DEFAULT_TICK_WIDTH) as i32;
-        let cursor_note = (inner_cursor.y / DEFAULT_KEY_HEIGHT) as u8;
+        let cursor_note = Pitch::new((inner_cursor.y / DEFAULT_KEY_HEIGHT) as i32, 12);
 
         let grid = self.settings.quantize.get_grid_lines((self.scroll_zoom_state.x.view_start / DEFAULT_TICK_WIDTH) as i32, (self.scroll_zoom_state.x.view_end / DEFAULT_TICK_WIDTH) as i32);
 
@@ -293,10 +289,10 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
             },
         ];
 
-        if let Selecting(start_tick, start_note) = self.state.action {
+        if let Selecting(start_tick, start_note) = &self.state.action {
             layers.push(
                 Primitive::Quad {
-                    bounds: self.selection_rect(start_tick, start_note, cursor_tick, cursor_note, &bounds),
+                    bounds: self.selection_rect(*start_tick, start_note, cursor_tick, &cursor_note, &bounds),
                     background: Background::Color(Color::TRANSPARENT),
                     border_radius: 2,
                     border_width: 2,
@@ -336,7 +332,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
 
         let inner_cursor = self.scroll_zoom_state.screen_to_inner(cursor_position, &bounds);
         let cursor_tick = (inner_cursor.x / DEFAULT_TICK_WIDTH) as i32;
-        let cursor_note = (inner_cursor.y / DEFAULT_KEY_HEIGHT) as u8;
+        let cursor_note = Pitch::new((inner_cursor.y / DEFAULT_KEY_HEIGHT) as i32, 12);
 
         let notes = self.notes.lock().unwrap();
 
@@ -345,9 +341,9 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
         match event {
             Event::Mouse(mouse_event) => match mouse_event {
                 mouse::Event::CursorMoved { .. } => {
-                    match self.state.action {
+                    match &self.state.action {
                         Dragging(note_id, drag_offset) => {
-                            if let Some(note) = notes.get(note_id) {
+                            if let Some(note) = notes.get(*note_id) {
                                 let quantize_offset = note.tick - self.settings.quantize.quantize_tick(note.tick);
                                 let mut tick = max(0, cursor_tick - drag_offset);
                                 if !self.state.modifiers.alt {
@@ -359,17 +355,17 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                                     .collect();
 
                                 if selected_notes.is_empty() {
-                                    selected_notes.push((note_id, &note))
+                                    selected_notes.push((*note_id, &note))
                                 }
 
                                 let min_tick = selected_notes.iter().map(|(_, note)| note.tick).min().unwrap();
 
-                                let min_note = selected_notes.iter().map(|(_, note)| note.note).min().unwrap() as i32;
-                                let max_note = selected_notes.iter().map(|(_, note)| note.note).max().unwrap() as i32;
+                                let min_note = selected_notes.iter().map(|(_, note)| note.pitch.clone()).min().unwrap();
+                                let max_note = selected_notes.iter().map(|(_, note)| note.pitch.clone()).max().unwrap();
 
                                 let tick_offset = max(-min_tick, tick - note.tick);
                                 // arbitrary max note
-                                let note_offset = (cursor_note as i32 - note.note as i32).clamp(-min_note, 64 - max_note);
+                                let note_offset = (cursor_note - note.pitch.clone()).clamp(-min_note, Pitch::new(8, 1) - max_note);
 
                                 // todo: optional mode for irregular grids?
                                 for (note_id, note) in selected_notes {
@@ -377,7 +373,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                                         note_id,
                                         Note {
                                             tick: note.tick + tick_offset,
-                                            note: (note.note as i32 + note_offset) as u8,
+                                            pitch: note.pitch.clone() + note_offset.clone(),
                                             ..*note
                                         }
                                     )));
@@ -385,7 +381,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                             }
                         },
                         Resizing(note_id, drag_offset) => {
-                            if let Some(note) = notes.get(note_id) {
+                            if let Some(note) = notes.get(*note_id) {
                                 let length = cursor_tick - note.tick - drag_offset;
 
                                 let mut selected_notes: Vec<(usize, &Note)> = self.state.selection.iter()
@@ -393,7 +389,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                                     .collect();
 
                                 if selected_notes.is_empty() {
-                                    selected_notes.push((note_id, &note))
+                                    selected_notes.push((*note_id, &note))
                                 }
 
                                 let min_length = selected_notes.iter().map(|(_, note)| note.length).min().unwrap();
@@ -405,7 +401,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                                         note_id,
                                         Note {
                                             length: note.length + length_offset,
-                                            ..*note
+                                            ..note.clone()
                                         }
                                     )));
                                 }
@@ -415,13 +411,13 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                             self.delete_hovered(messages);
                         },
                         Selecting(start_tick, start_note) => {
-                            let from_tick = min(start_tick, cursor_tick);
-                            let to_tick = max(start_tick, cursor_tick);
-                            let from_note = min(start_note, cursor_note);
-                            let to_note = max(start_note, cursor_note);
+                            let from_tick = min(start_tick, &cursor_tick).clone();
+                            let to_tick = max(start_tick, &cursor_tick).clone();
+                            let from_note = min(start_note, &cursor_note).clone();
+                            let to_note = max(start_note, &cursor_note).clone();
 
                             self.state.selection = notes.iter().enumerate()
-                                .filter(|(_id, note)| note.tick <= to_tick && note.end_tick() >= from_tick && note.note <= to_note && note.note >= from_note)
+                                .filter(|(_id, note)| note.tick <= to_tick && note.end_tick() >= from_tick && note.pitch <= to_note && note.pitch >= from_note)
                                 .map(|(id, _note)| id)
                                 .collect();
                         }
@@ -443,7 +439,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
 
                                 let note = Note {
                                     tick,
-                                    note: cursor_note,
+                                    pitch: cursor_note.clone(),
                                     length: 40,
                                 };
 
@@ -452,14 +448,14 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                                 self.state.selection.clear();
                             },
                             CanDrag(idx) => {
-                                let note = notes[idx];
+                                let note = &notes[idx];
                                 self.state.action = Dragging(idx, cursor_tick - note.tick);
                                 if !self.state.selection.contains(&idx) {
                                     self.state.selection.clear();
                                 }
                             },
                             CanResize(idx) => {
-                                let note = notes[idx];
+                                let note = &notes[idx];
                                 self.state.action = Resizing(idx, cursor_tick - note.tick - note.length);
                                 if !self.state.selection.contains(&idx) {
                                     self.state.selection.clear();

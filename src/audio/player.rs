@@ -58,11 +58,11 @@ impl Player {
             if start_sample >= self.cursor && start_sample < cursor_end {
                 self.controller.send_event(Event{
                     sample: self.start_sample + start_sample,
-                    data: EventData::NoteOn(*note),
+                    data: EventData::NoteOn(note.clone()),
                 });
                 self.controller.send_event(Event{
                     sample: self.start_sample + end_sample,
-                    data: EventData::NoteOff(*note),
+                    data: EventData::NoteOff(note.clone()),
                 });
             }
         }
