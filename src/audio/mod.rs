@@ -44,7 +44,7 @@ impl Synth {
         let (controller, source) = RedoxSynthGenerator::new(config.sample_rate.0 as f32, "gm.sf2")
             .expect("redoxsynth init to succeed");
         let mut player = Player::new(200, notes.clone(), Box::new(controller));
-        let delay = Delay::new(10000, 0.5, 1.0, 0.75);
+        let delay = Delay::new(10000, 0.0, 1.0, 0.75);
         let fxsource = FxSource::new(Box::new(source), vec![Box::new(delay)]);
         emitter.start(Box::new(fxsource));
 

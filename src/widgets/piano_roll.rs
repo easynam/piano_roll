@@ -105,26 +105,13 @@ impl<'a, Message> PianoRoll<'a, Message> {
 
         let inner = Rectangle {
             x: from_tick as f32 * DEFAULT_TICK_WIDTH,
-            y: from_note.to_f32() * DEFAULT_OCTAVE_HEIGHT,
+            y: -to_note.to_f32() * DEFAULT_OCTAVE_HEIGHT - DEFAULT_OCTAVE_HEIGHT/24.0,
             width: (to_tick - from_tick + 1) as f32 * DEFAULT_TICK_WIDTH,
             height: (to_note.clone() - from_note.clone() + Pitch::new(1, 12)).to_f32() * DEFAULT_OCTAVE_HEIGHT,
         };
 
         self.scroll_zoom_state.inner_rect_to_screen(inner, &bounds)
     }
-
-    // pub fn inner_rect_to_screen(&self, rect: Rectangle, bounds: &Rectangle) -> Rectangle {
-    //     Rectangle {
-    //         x: self.x.inner_to_screen(rect.x, bounds.x, bounds.width),
-    //         y: self.y.inner_to_screen(rect.y, bounds.y, bounds.height),
-    //         width: rect.width * self.x.scale(bounds.width),
-    //         height: rect.height * self.y.scale(bounds.height),
-    //     }
-    // }
-
-    // pub fn inner_to_screen(&self, pos: f32, bounds_offset: f32, bounds_size: f32) -> f32 {
-    //     (pos + bounds_offset - self.scroll()) * self.scale(bounds_size)
-    // }
 
     fn note_rect(&self, note: &Note, bounds: Rectangle,) -> Rectangle {
         let height = self.scroll_zoom_state.y.scale(bounds.height) * DEFAULT_OCTAVE_HEIGHT / 12.0;
