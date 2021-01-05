@@ -93,10 +93,12 @@ impl Source for RedoxSynthSource {
 
             match &event.data {
                 EventData::NoteOn(n) => {
-                    self.synth.note_on(0, n.pitch.midi_pitch(), 127);
+                    let (key, bend) = n.pitch.midi_pitch(2.0);
+                    self.synth.note_on(0, key, 127);
+                    self.synth.pitch_bend(0, bend);
                 }
                 EventData::NoteOff(n) => {
-                    self.synth.note_off(0, n.pitch.midi_pitch());
+                    self.synth.note_off(0, n.pitch.midi_pitch(2.0).0);
                 }
             }
         }

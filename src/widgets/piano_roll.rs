@@ -254,16 +254,16 @@ impl<'a, Message> PianoRoll<'a, Message> {
                     let y = line.pitch.to_f32() * DEFAULT_OCTAVE_HEIGHT;
 
                     let colour = match line.line_type {
-                        pitch_grid::LineType::White => Color::from_rgb(0.45, 0.45, 0.45),
-                        pitch_grid::LineType::Black => Color::from_rgb(0.35, 0.35, 0.35),
+                        pitch_grid::LineType::White => Color::from_rgb(0.55, 0.55, 0.55),
+                        pitch_grid::LineType::Black => Color::from_rgb(0.40, 0.40, 0.40),
                     };
 
                     Primitive::Quad {
                         bounds: Rectangle {
                             x: bounds.x,
-                            y: self.scroll_zoom_state.y.inner_to_screen(y, bounds.y, bounds.height) - 2.0,
+                            y: (self.scroll_zoom_state.y.inner_to_screen(y, bounds.y, bounds.height) - 0.5).round(),
                             width: bounds.width,
-                            height: 4.0
+                            height: 1.0
                         },
                         background: Background::Color(colour),
                         border_radius: 0,

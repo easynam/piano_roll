@@ -70,8 +70,11 @@ impl Pitch {
         440.0 * 2.0_f32.powf(octave)
     }
 
-    pub fn midi_pitch(&self) -> u32 {
-        (self.0.to_f32().unwrap() * 12.0 + 69.0).round() as u32
+    pub fn midi_pitch(&self, pitch_bend_range: f32) -> (u32, u32) {
+        let midi_pitch = self.0.to_f32().unwrap() * 12.0 + 69.0;
+        let rounded = midi_pitch.round();
+        let pitch_bend = ((midi_pitch - rounded) * 8192.0 / pitch_bend_range + 8192.0) as u32;
+        (rounded as u32, pitch_bend)
     }
 
     pub fn to_f32(&self) -> f32 {
