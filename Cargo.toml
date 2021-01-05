@@ -14,9 +14,7 @@ num-rational = "0.3.2"
 num-traits = "0.2.14"
 cpal = "0.13.1"
 crossbeam = "0.8.0"
-redoxsynth = { path = "./redoxsynth" }
+redoxsynth = { path = "crates/redoxsynth" }
 
 [workspace]
-members = [
-    "redoxsynth",
-]
+members = ["crates/*"]
