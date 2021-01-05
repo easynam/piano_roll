@@ -2064,6 +2064,7 @@ dependencies = [
  "iced",
  "iced_native",
  "iced_wgpu",
+ "num-bigint",
  "num-rational",
  "num-traits",
  "redoxsynth",

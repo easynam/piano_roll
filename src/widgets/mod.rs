@@ -1,3 +1,4 @@
 pub mod scroll_bar;
 pub mod piano_roll;
-pub mod barlines;
+pub mod tick_grid;
+pub mod pitch_grid;

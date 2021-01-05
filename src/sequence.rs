@@ -1,7 +1,8 @@
 // use fraction::{Fraction, BigFraction, DynaFraction, ToPrimitive, Ratio};
 use num_rational::{Rational32, Ratio};
 use num_traits::cast::ToPrimitive;
-use std::ops::{Neg, Add, Sub};
+use std::ops::{Neg, Add, Sub, Div};
+use num_bigint::BigInt;
 
 pub type Sequence = Vec<Note>;
 
@@ -42,6 +43,26 @@ impl Neg for Pitch {
 impl Pitch {
     pub fn new(num: i32, den: i32) -> Self {
         Pitch(Ratio::new(num, den))
+    }
+
+    pub fn from_octave(octave: Rational32) -> Self {
+        Pitch(octave)
+    }
+
+    pub fn from_octave_f32(octave: f32) -> Self {
+        let (mut num, mut den) = {
+            let ratio = Ratio::from_float(octave).unwrap();
+            (ratio.numer().clone(), ratio.denom().clone())
+        };
+
+        let max: BigInt = BigInt::from(std::i32::MAX);
+
+        while num > max || den > max {
+            num = num.div(2);
+            den = den.div(2);
+        }
+
+        Pitch(Ratio::new(num.to_i32().unwrap(), den.to_i32().unwrap()))
     }
 
     pub fn hz(&self) -> f32 {

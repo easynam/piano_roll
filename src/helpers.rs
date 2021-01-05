@@ -66,7 +66,7 @@ impl RectangleHelpers for Rectangle {
         }
     }
 
-    fn normalize_within_bounds(&self, bounds: &Rectangle) -> Rectangle<f32> {
+    fn normalize_within_bounds(&self, _bounds: &Rectangle) -> Rectangle<f32> {
         unimplemented!()
     }
 }

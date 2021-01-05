@@ -12,6 +12,7 @@ iced_native = "0.2.2"
 iced_wgpu = "0.2.3"
 num-rational = "0.3.2"
 num-traits = "0.2.14"
+num-bigint = "0.3.1"
 cpal = "0.13.1"
 crossbeam = "0.8.0"
 redoxsynth = { path = "crates/redoxsynth" }

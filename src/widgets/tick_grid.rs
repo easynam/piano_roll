@@ -9,7 +9,7 @@ pub struct GridLine {
     pub line_type: LineType,
 }
 
-pub trait QuantizeGrid {
+pub trait TickGrid {
     fn get_grid_lines(&self, start: i32, end: i32) -> Vec<GridLine>;
     fn quantize_tick(&self, tick: i32) -> i32;
 }
@@ -18,7 +18,7 @@ pub struct SimpleGrid {
     pub(crate) ticks_per_16th: i32,
 }
 
-impl QuantizeGrid for SimpleGrid {
+impl TickGrid for SimpleGrid {
     fn get_grid_lines(&self, start: i32, end: i32) -> Vec<GridLine> {
         (start..=end+1)
             .filter(|n| n % self.ticks_per_16th == 0)

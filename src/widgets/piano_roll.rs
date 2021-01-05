@@ -10,9 +10,11 @@ use crate::scroll_zoom::{ScrollZoomState};
 use crate::helpers::RectangleHelpers;
 use crate::sequence::{Note, Sequence, SequenceChange, Pitch};
 use crate::sequence::SequenceChange::{Update, Add, Remove};
-use crate::widgets::barlines::{QuantizeGrid, SimpleGrid, LineType};
+use crate::widgets::tick_grid::{TickGrid, SimpleGrid, LineType};
 use iced_native::input::keyboard::ModifiersState;
 use std::cmp::min;
+use crate::widgets::pitch_grid::{PitchGrid, TetGrid};
+use crate::widgets::pitch_grid;
 
 const DEFAULT_OCTAVE_HEIGHT: f32 = 200.0;
 const DEFAULT_TICK_WIDTH: f32 = 1.0;
@@ -33,13 +35,28 @@ pub struct PianoRollState {
 }
 
 pub struct PianoRollSettings {
-    quantize: Box<dyn QuantizeGrid>,
+    tick_grid: Box<dyn TickGrid>,
+    pitch_grid: Box<dyn PitchGrid>,
 }
 
 impl Default for PianoRollSettings {
     fn default() -> Self {
         PianoRollSettings {
-            quantize: Box::new(SimpleGrid { ticks_per_16th: 32, }),
+            tick_grid: Box::new(SimpleGrid { ticks_per_16th: 32, }),
+            pitch_grid: Box::new(TetGrid { tones_per_octave: 12, pattern: vec![
+                pitch_grid::LineType::White,
+                pitch_grid::LineType::Black,
+                pitch_grid::LineType::White,
+                pitch_grid::LineType::Black,
+                pitch_grid::LineType::White,
+                pitch_grid::LineType::White,
+                pitch_grid::LineType::Black,
+                pitch_grid::LineType::White,
+                pitch_grid::LineType::Black,
+                pitch_grid::LineType::White,
+                pitch_grid::LineType::White,
+                pitch_grid::LineType::Black,
+            ]}),
         }
     }
 }
@@ -186,6 +203,78 @@ impl<'a, Message> PianoRoll<'a, Message> {
             _ => {},
         }
     }
+
+    fn draw_tick_grid(&self, bounds: Rectangle) -> Vec<Primitive> {
+        let lines = {
+            let grid = self.settings.tick_grid.get_grid_lines((self.scroll_zoom_state.x.view_start / DEFAULT_TICK_WIDTH) as i32, (self.scroll_zoom_state.x.view_end / DEFAULT_TICK_WIDTH) as i32);
+
+            grid.iter()
+                .map(|line| {
+                    let x = line.tick as f32 * DEFAULT_TICK_WIDTH * self.scroll_zoom_state.x.scale(bounds.width);
+
+                    let colour = match line.line_type {
+                        LineType::Bar => Color::from_rgb(0.1, 0.1, 0.1),
+                        LineType::Beat => Color::from_rgb(0.1, 0.1, 0.1),
+                        LineType::InBetween => Color::from_rgb(0.2, 0.2, 0.2),
+                    };
+
+                    let thickness = match line.line_type {
+                        LineType::Bar => 2.0,
+                        LineType::Beat => 1.0,
+                        LineType::InBetween => 1.0,
+                    };
+
+                    Primitive::Quad {
+                        bounds: Rectangle {
+                            x: (x - thickness / 2.0 - self.scroll_zoom_state.x.view_start * self.scroll_zoom_state.x.scale(bounds.width) + bounds.x).round(),
+                            y: bounds.y,
+                            width: thickness,
+                            height: bounds.height
+                        },
+                        background: Background::Color(colour),
+                        border_radius: 0,
+                        border_width: 0,
+                        border_color: Color::BLACK
+                    }
+                })
+                .collect()
+        };
+        lines
+    }
+
+    fn draw_pitch_grid(&self, bounds: Rectangle) -> Vec<Primitive> {
+        let lines = {
+            let grid = self.settings.pitch_grid.get_grid_lines(
+                Pitch::from_octave_f32(self.scroll_zoom_state.y.view_start / DEFAULT_OCTAVE_HEIGHT),
+                Pitch::from_octave_f32(self.scroll_zoom_state.y.view_end / DEFAULT_OCTAVE_HEIGHT)
+            );
+
+            grid.iter()
+                .map(|line| {
+                    let y = line.pitch.to_f32() * DEFAULT_OCTAVE_HEIGHT;
+
+                    let colour = match line.line_type {
+                        pitch_grid::LineType::White => Color::from_rgb(0.45, 0.45, 0.45),
+                        pitch_grid::LineType::Black => Color::from_rgb(0.35, 0.35, 0.35),
+                    };
+
+                    Primitive::Quad {
+                        bounds: Rectangle {
+                            x: bounds.x,
+                            y: self.scroll_zoom_state.y.inner_to_screen(y, bounds.y, bounds.height) - 2.0,
+                            width: bounds.width,
+                            height: 4.0
+                        },
+                        background: Background::Color(colour),
+                        border_radius: 0,
+                        border_width: 0,
+                        border_color: Color::BLACK
+                    }
+                })
+                .collect()
+        };
+        lines
+    }
 }
 
 impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
@@ -214,38 +303,8 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
         let cursor_tick = (inner_cursor.x / DEFAULT_TICK_WIDTH) as i32;
         let cursor_note = Pitch::new(-(12.0 * inner_cursor.y / DEFAULT_OCTAVE_HEIGHT).round() as i32, 12);
 
-        let grid = self.settings.quantize.get_grid_lines((self.scroll_zoom_state.x.view_start / DEFAULT_TICK_WIDTH) as i32, (self.scroll_zoom_state.x.view_end / DEFAULT_TICK_WIDTH) as i32);
-
-        let lines = grid.iter()
-            .map(|line| {
-                let x = line.tick as f32 * DEFAULT_TICK_WIDTH * self.scroll_zoom_state.x.scale(bounds.width);
-
-                let colour = match line.line_type {
-                    LineType::Bar => Color::from_rgb(0.1,0.1,0.1),
-                    LineType::Beat => Color::from_rgb(0.1,0.1,0.1),
-                    LineType::InBetween => Color::from_rgb(0.2,0.2,0.2),
-                };
-
-                let thickness = match line.line_type {
-                    LineType::Bar => 2.0,
-                    LineType::Beat => 1.0,
-                    LineType::InBetween => 1.0,
-                };
-
-                Primitive::Quad {
-                    bounds: Rectangle {
-                        x: (x - thickness/2.0 - self.scroll_zoom_state.x.view_start * self.scroll_zoom_state.x.scale(bounds.width) + bounds.x).round(),
-                        y: bounds.y,
-                        width: thickness,
-                        height: bounds.height
-                    },
-                    background: Background::Color(colour),
-                    border_radius: 0,
-                    border_width: 0,
-                    border_color: Color::BLACK
-                }
-            })
-            .collect();
+        let tick_grid_lines = self.draw_tick_grid(bounds);
+        let pitch_grid_lines = self.draw_pitch_grid(bounds);
 
         let mut layers = vec![
             Primitive::Quad {
@@ -256,7 +315,10 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                 border_color: Color::BLACK,
             },
             Primitive::Group {
-                primitives: lines
+                primitives: pitch_grid_lines
+            },
+            Primitive::Group {
+                primitives: tick_grid_lines
             },
             Primitive::Group {
                 primitives: self.notes.lock().unwrap().iter().enumerate()
@@ -333,10 +395,10 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                     match &self.state.action {
                         Dragging(note_id, drag_offset) => {
                             if let Some(note) = notes.get(*note_id) {
-                                let quantize_offset = note.tick - self.settings.quantize.quantize_tick(note.tick);
+                                let quantize_offset = note.tick - self.settings.tick_grid.quantize_tick(note.tick);
                                 let mut tick = max(0, cursor_tick - drag_offset);
                                 if !self.state.modifiers.alt {
-                                    tick = self.settings.quantize.quantize_tick(tick - quantize_offset) + quantize_offset;
+                                    tick = self.settings.tick_grid.quantize_tick(tick - quantize_offset) + quantize_offset;
                                 }
 
                                 let mut selected_notes: Vec<(usize, &Note)> = self.state.selection.iter()
@@ -423,7 +485,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                                 let mut tick = cursor_tick;
 
                                 if !self.state.modifiers.alt {
-                                    tick = self.settings.quantize.quantize_tick(tick);
+                                    tick = self.settings.tick_grid.quantize_tick(tick);
                                 }
 
                                 let note = Note {
@@ -454,7 +516,8 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                     } }
                 mouse::Event::Input { button: mouse::Button::Right, state: ButtonState::Pressed, } => {
                     //TODO prevent doubling up on deletes
-                    self.delete_hovered(messages)
+                    self.state.action = Action::Deleting;
+
                 }
                 mouse::Event::Input { button: mouse::Button::Left, state: ButtonState::Released, } => {
                     self.state.action = Action::None;
