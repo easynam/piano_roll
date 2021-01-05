@@ -127,11 +127,13 @@ impl<'a, Message> PianoRoll<'a, Message> {
     // }
 
     fn note_rect(&self, note: &Note, bounds: Rectangle,) -> Rectangle {
+        let height = self.scroll_zoom_state.y.scale(bounds.height) * DEFAULT_OCTAVE_HEIGHT / 12.0;
+
         Rectangle {
             x: (note.tick as f32 * DEFAULT_TICK_WIDTH - self.scroll_zoom_state.x.scroll()) * self.scroll_zoom_state.x.scale(bounds.width) + bounds.x,
-            y: (note.pitch.to_f32() * DEFAULT_OCTAVE_HEIGHT - self.scroll_zoom_state.y.scroll()) * self.scroll_zoom_state.y.scale(bounds.height) + bounds.y,
+            y: (-note.pitch.to_f32() * DEFAULT_OCTAVE_HEIGHT - self.scroll_zoom_state.y.scroll()) * self.scroll_zoom_state.y.scale(bounds.height) + bounds.y - height/2.0,
             width: note.length as f32 * self.scroll_zoom_state.x.scale(bounds.width) * DEFAULT_TICK_WIDTH,
-            height: self.scroll_zoom_state.y.scale(bounds.height) * DEFAULT_OCTAVE_HEIGHT / 12.0,
+            height,
         }
     }
 
@@ -223,7 +225,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
 
         let inner_cursor = self.scroll_zoom_state.screen_to_inner(cursor_position, &bounds);
         let cursor_tick = (inner_cursor.x / DEFAULT_TICK_WIDTH) as i32;
-        let cursor_note = Pitch::new((12.0 * inner_cursor.y / DEFAULT_OCTAVE_HEIGHT).floor() as i32, 12);
+        let cursor_note = Pitch::new(-(12.0 * inner_cursor.y / DEFAULT_OCTAVE_HEIGHT).round() as i32, 12);
 
         let grid = self.settings.quantize.get_grid_lines((self.scroll_zoom_state.x.view_start / DEFAULT_TICK_WIDTH) as i32, (self.scroll_zoom_state.x.view_end / DEFAULT_TICK_WIDTH) as i32);
 
@@ -332,7 +334,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
 
         let inner_cursor = self.scroll_zoom_state.screen_to_inner(cursor_position, &bounds);
         let cursor_tick = (inner_cursor.x / DEFAULT_TICK_WIDTH) as i32;
-        let cursor_note = Pitch::new((12.0 * inner_cursor.y / DEFAULT_OCTAVE_HEIGHT).floor() as i32, 12);
+        let cursor_note = Pitch::new(-(12.0 * inner_cursor.y / DEFAULT_OCTAVE_HEIGHT).round() as i32, 12);
 
         let notes = self.notes.lock().unwrap();
 
@@ -365,7 +367,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
 
                                 let tick_offset = max(-min_tick, tick - note.tick);
                                 // arbitrary max note
-                                let note_offset = (cursor_note - note.pitch.clone()).clamp(Pitch::new(-4, 1) - min_note, Pitch::new(47, 12) - max_note);
+                                let note_offset = (cursor_note - note.pitch.clone()).clamp(Pitch::new(-4, 1) - min_note, Pitch::new(4, 1) - max_note);
 
                                 // todo: optional mode for irregular grids?
                                 for (note_id, note) in selected_notes {
