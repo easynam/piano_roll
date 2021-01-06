@@ -12,6 +12,7 @@ pub struct GridLine {
 pub trait TickGrid {
     fn get_grid_lines(&self, start: i32, end: i32) -> Vec<GridLine>;
     fn quantize_tick(&self, tick: i32) -> i32;
+    fn grid_size(&self, tick: i32) -> i32;
 }
 
 pub struct SimpleGrid {
@@ -34,5 +35,9 @@ impl TickGrid for SimpleGrid {
 
     fn quantize_tick(&self, tick: i32) -> i32 {
         return ((tick + self.ticks_per_16th/2) / self.ticks_per_16th) * self.ticks_per_16th;
+    }
+
+    fn grid_size(&self, tick: i32) -> i32 {
+        return self.ticks_per_16th;
     }
 }

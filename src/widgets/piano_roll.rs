@@ -441,7 +441,12 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                         },
                         Resizing(note_id, drag_offset) => {
                             if let Some(note) = notes.get(*note_id) {
-                                let length = cursor_tick - note.tick - drag_offset;
+                                let quantize_offset = note.tick + note.length - self.settings.tick_grid.quantize_tick(note.tick + note.length);
+                                let mut tick = cursor_tick - drag_offset;
+                                if !self.state.modifiers.alt {
+                                    tick = self.settings.tick_grid.quantize_tick(tick - quantize_offset) + quantize_offset;
+                                }
+                                let length = tick - note.tick;
 
                                 let mut selected_notes: Vec<(usize, &Note)> = self.state.selection.iter()
                                     .filter_map(|id| notes.get(*id).map(|note| (*id, note)))
@@ -451,7 +456,10 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                                     selected_notes.push((*note_id, &note))
                                 }
 
-                                let min_length = selected_notes.iter().map(|(_, note)| note.length).min().unwrap();
+                                let mut min_length = selected_notes.iter().map(|(_, note)| note.length).min().unwrap();
+                                if !self.state.modifiers.alt {
+                                    min_length -= self.settings.tick_grid.grid_size(tick);
+                                }
 
                                 let length_offset =  max(-min_length, length - note.length);
 
@@ -497,10 +505,15 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                                     tick = self.settings.tick_grid.quantize_tick(tick);
                                 }
 
+
                                 match self.state.modifiers.shift {
                                     true => {
+                                        let length = match self.state.modifiers.alt {
+                                            true => 0,
+                                            false => self.settings.tick_grid.grid_size(tick),
+                                        };
                                         self.state.action = Resizing(notes.len(), cursor_tick - tick);
-                                        let note = Note { tick, pitch: cursor_note.clone(), length: 0 };
+                                        let note = Note { tick, pitch: cursor_note.clone(), length };
                                         messages.push( (self.on_change)(Add(note)));
                                     }
                                     false => {
