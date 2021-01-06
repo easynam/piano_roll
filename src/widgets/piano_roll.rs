@@ -53,7 +53,7 @@ impl Default for PianoRollSettings {
                 pitch_grid::LineType::Black,
                 pitch_grid::LineType::White,
                 pitch_grid::LineType::Black,
-                pitch_grid::LineType::White,
+                pitch_grid::LineType::Tonic,
                 pitch_grid::LineType::White,
                 pitch_grid::LineType::Black,
             ]}),
@@ -213,9 +213,9 @@ impl<'a, Message> PianoRoll<'a, Message> {
                     let x = line.tick as f32 * DEFAULT_TICK_WIDTH * self.scroll_zoom_state.x.scale(bounds.width);
 
                     let colour = match line.line_type {
-                        LineType::Bar => Color::from_rgb(0.1, 0.1, 0.1),
+                        LineType::Bar => Color::from_rgb(0.0, 0.0, 0.0),
                         LineType::Beat => Color::from_rgb(0.1, 0.1, 0.1),
-                        LineType::InBetween => Color::from_rgb(0.2, 0.2, 0.2),
+                        LineType::InBetween => Color::from_rgb(0.15, 0.15, 0.15),
                     };
 
                     let thickness = match line.line_type {
@@ -254,16 +254,23 @@ impl<'a, Message> PianoRoll<'a, Message> {
                     let y = line.pitch.to_f32() * DEFAULT_OCTAVE_HEIGHT;
 
                     let colour = match line.line_type {
-                        pitch_grid::LineType::White => Color::from_rgb(0.55, 0.55, 0.55),
-                        pitch_grid::LineType::Black => Color::from_rgb(0.40, 0.40, 0.40),
+                        pitch_grid::LineType::Tonic => Color::from([0.5, 1.0, 0.5, 0.3]),
+                        pitch_grid::LineType::White => Color::from([1.0, 1.0, 1.0, 0.15]),
+                        pitch_grid::LineType::Black => Color::from([1.0, 1.0, 1.0, 0.05]),
+                    };
+
+                    let thickness = match line.line_type {
+                        pitch_grid::LineType::Tonic => 2.0,
+                        pitch_grid::LineType::White => 2.0,
+                        pitch_grid::LineType::Black => 1.0,
                     };
 
                     Primitive::Quad {
                         bounds: Rectangle {
                             x: bounds.x,
-                            y: (self.scroll_zoom_state.y.inner_to_screen(y, bounds.y, bounds.height) - 0.5).round(),
+                            y: (self.scroll_zoom_state.y.inner_to_screen(y, bounds.y, bounds.height) - thickness/2.0).round(),
                             width: bounds.width,
-                            height: 1.0
+                            height: thickness
                         },
                         background: Background::Color(colour),
                         border_radius: 0,
@@ -309,16 +316,16 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
         let mut layers = vec![
             Primitive::Quad {
                 bounds,
-                background: Background::Color(Color::from_rgb(0.3,0.3,0.3)),
+                background: Background::Color(Color::from_rgb(0.2,0.2,0.2)),
                 border_radius: 0,
                 border_width: 0,
                 border_color: Color::BLACK,
             },
             Primitive::Group {
-                primitives: pitch_grid_lines
+                primitives: tick_grid_lines
             },
             Primitive::Group {
-                primitives: tick_grid_lines
+                primitives: pitch_grid_lines
             },
             Primitive::Group {
                 primitives: self.notes.lock().unwrap().iter().enumerate()

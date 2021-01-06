@@ -4,6 +4,7 @@ use num_rational::Ratio;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum LineType {
+    Tonic,
     White,
     Black,
 }
