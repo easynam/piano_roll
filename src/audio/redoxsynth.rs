@@ -67,7 +67,7 @@ impl RedoxSynthSource {
 }
 
 impl Source for RedoxSynthSource {
-    fn output_audio(&mut self, sample: usize, data: &mut [f32]) {
+    fn output_audio(&mut self, sample: usize, data: &mut [f64]) {
         // TODO: hardcoded channel count
         let length = data.len() / 2;
 

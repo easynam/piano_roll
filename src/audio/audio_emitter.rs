@@ -54,11 +54,15 @@ impl AudioEmitter {
         let mut counter = 0usize;
         let ch = config.channels as usize;
 
+        let mut buffer = Vec::new();
+
         let stream = device
             .build_output_stream(
                 config,
                 move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
-                    source.output_audio(counter, data);
+                    buffer.resize(data.len(), Default::default());
+                    source.output_audio(counter, buffer.as_mut_slice());
+                    data.iter_mut().zip(buffer.iter()).for_each(|(dst, src)| *dst = *src as f32);
                     counter += data.len() / ch;
                     counter_atomic.store(counter, Ordering::Release);
                 },

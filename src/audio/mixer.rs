@@ -2,7 +2,7 @@ use super::source::Source;
 
 pub struct Mixer {
     sources: Vec<Box<dyn Source>>,
-    buffer: Vec<f32>,
+    buffer: Vec<f64>,
 }
 
 impl Mixer {
@@ -18,7 +18,7 @@ impl Mixer {
 }
 
 impl Source for Mixer {
-    fn output_audio(&mut self, mut sample: usize, output: &mut [f32]) {
+    fn output_audio(&mut self, mut sample: usize, output: &mut [f64]) {
         for output_chunk in output.chunks_mut(self.buffer.len()) {
             output_chunk.fill(Default::default());
 
