@@ -1006,7 +1006,7 @@ impl Synth {
         self.chorus.update();
     }
 
-    pub unsafe fn write_float(
+    pub unsafe fn write_f32(
         &mut self,
         len: i32,
         lout: *mut libc::c_void,
@@ -1046,6 +1046,48 @@ impl Synth {
         self.cur = l;
         return 0 as i32;
     }
+
+    pub unsafe fn write_f64(
+        &mut self,
+        len: i32,
+        lout: *mut libc::c_void,
+        loff: i32,
+        lincr: i32,
+        rout: *mut libc::c_void,
+        roff: i32,
+        rincr: i32,
+    ) -> i32 {
+        let mut i;
+        let mut j;
+        let mut k;
+        let mut l;
+        let left_out: *mut f64 = lout as *mut f64;
+        let right_out: *mut f64 = rout as *mut f64;
+        let left_in: *mut f32 = self.left_buf[0].as_mut_ptr();
+        let right_in: *mut f32 = self.right_buf[0].as_mut_ptr();
+        if self.state != FLUID_SYNTH_PLAYING as i32 as u32 {
+            return 0 as i32;
+        }
+        l = self.cur;
+        i = 0 as i32;
+        j = loff;
+        k = roff;
+        while i < len {
+            if l == 64 as i32 {
+                self.one_block(0 as i32);
+                l = 0 as i32
+            }
+            *left_out.offset(j as isize) = *left_in.offset(l as isize) as f64;
+            *right_out.offset(k as isize) = *right_in.offset(l as isize) as f64;
+            i += 1;
+            l += 1;
+            j += lincr;
+            k += rincr
+        }
+        self.cur = l;
+        return 0 as i32;
+    }
+
 
     pub unsafe fn write_s16(
         &mut self,

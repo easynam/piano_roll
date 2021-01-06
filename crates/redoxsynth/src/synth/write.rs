@@ -37,6 +37,14 @@ impl IsSamples for (&mut [f32], &mut [f32]) {
     }
 }
 
+impl IsSamples for &mut [f64] {
+    /// Write samples interleaved
+    fn write_samples(self, synth: &mut Synth) -> Status {
+        let len = self.len() / 2;
+        unsafe { synth.write_f64(len, self.as_mut_ptr(), 0, 2, self.as_mut_ptr(), 1, 2) }
+    }
+}
+
 /**
 Synthesizer plugin
  */
@@ -93,7 +101,32 @@ impl Synth {
         roff: u32,
         rincr: u32,
     ) -> Status {
-        Synth::zero_ok(self.handle.write_float(
+        Synth::zero_ok(self.handle.write_f32(
+            len as _, lbuf as _, loff as _, lincr as _, rbuf as _, roff as _, rincr as _,
+        ))
+    }
+
+    /**
+    Write samples as 64-bit floating-point numbers
+
+    # Safety
+
+    The `len` must corresponds to the lenghtes of buffers.
+     */
+    #[allow(clippy::missing_safety_doc)] // TODO: Remove after closing https://github.com/rust-lang/rust-clippy/issues/5593
+    #[allow(clippy::too_many_arguments)]
+    #[inline]
+    pub unsafe fn write_f64(
+        &mut self,
+        len: usize,
+        lbuf: *mut f64,
+        loff: u32,
+        lincr: u32,
+        rbuf: *mut f64,
+        roff: u32,
+        rincr: u32,
+    ) -> Status {
+        Synth::zero_ok(self.handle.write_f64(
             len as _, lbuf as _, loff as _, lincr as _, rbuf as _, roff as _, rincr as _,
         ))
     }
