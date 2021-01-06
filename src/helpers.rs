@@ -51,7 +51,7 @@ impl RectangleHelpers for Rectangle {
         let inner_size = inner_size(self.width);
 
         Rectangle {
-            y: self.y + self.width - inner_size,
+            y: self.y + self.height - inner_size,
             height: inner_size + RESIZE_OUTER,
             ..*self
         }

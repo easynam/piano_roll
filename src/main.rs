@@ -4,7 +4,7 @@ use widgets::piano_roll::{PianoRoll, PianoRollSettings};
 use std::{fmt::Debug, sync::{Arc, Mutex}};
 use crate::scroll_zoom::{ScrollZoomState, ScrollScaleAxisChange, ScrollScaleAxis};
 use crate::sequence::{SequenceChange, Sequence, update_sequence};
-use crate::widgets::scroll_bar::{ScrollZoomBarState, ScrollZoomBarX};
+use crate::widgets::scroll_bar::{ScrollZoomBarState, Orientation, ScrollZoomBar};
 use widgets::piano_roll;
 use iced_native::widget::button;
 use std::sync::mpsc::SyncSender;
@@ -117,19 +117,25 @@ impl Sandbox for App {
 
     fn view(&mut self) -> Element<Self::Message> {
         Column::new()
-            .push(Container::new(
-                PianoRoll::new(&mut self.piano_roll, self.notes.as_ref(), Message::Sequence, Message::PianoRoll, &self.scroll_zoom, &self.settings))
-                .max_height(600)
+            .push(Row::new()
+                .push(Container::new(
+                    PianoRoll::new(&mut self.piano_roll, self.notes.as_ref(), Message::Sequence, Message::PianoRoll, &self.scroll_zoom, &self.settings))
+                    .max_width(800)
+                    .max_height(600))
+                .push(Container::new(
+                    ScrollZoomBar::new(
+                        &mut self.scroll_bar_2, &self.scroll_zoom.y, Message::Scroll2, Orientation::Vertical, false
+                    ))
+                    .max_height(600)
+                    .max_width(20)
+                )
             )
             .push(Container::new(
-                ScrollZoomBarX::new(
-                    &mut self.scroll_bar, &self.scroll_zoom.x, Message::Scroll, false
-                )).max_height(20)
-            )
-            .push(Container::new(
-                ScrollZoomBarX::new(
-                    &mut self.scroll_bar_2, &self.scroll_zoom.y, Message::Scroll2, false
-                )).max_height(20)
+                ScrollZoomBar::new(
+                    &mut self.scroll_bar, &self.scroll_zoom.x, Message::Scroll, Orientation::Horizontal, false
+                ))
+                .max_width(800)
+                .max_height(20)
             )
             .push(Row::new()
                 .push(Button::new(&mut self.play_button, Text::new("Play"))
