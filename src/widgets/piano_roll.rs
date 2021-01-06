@@ -23,12 +23,13 @@ pub struct PianoRoll<'a, Message> {
     state: &'a mut PianoRollState,
     notes: &'a Mutex<Sequence>,
     on_change: Box<dyn Fn(SequenceChange) -> Message + 'a>,
+    on_action_change: Box<dyn Fn(Action) -> Message + 'a>,
     scroll_zoom_state: &'a ScrollZoomState,
     settings: &'a PianoRollSettings,
 }
 
 pub struct PianoRollState {
-    action: Action,
+    pub(crate) action: Action,
     hover: HoverState,
     modifiers: ModifiersState,
     selection: Vec<usize>,
@@ -68,8 +69,8 @@ enum HoverState {
     CanResize(usize),
 }
 
-#[derive(PartialEq)]
-enum Action {
+#[derive(Debug, Clone, PartialEq)]
+pub enum Action {
     None,
     Deleting,
     Dragging(usize, i32),
@@ -95,21 +96,24 @@ impl PianoRollState {
 }
 
 impl<'a, Message> PianoRoll<'a, Message> {
-    pub fn new<F>(
+    pub fn new<F, FA>(
         state: &'a mut PianoRollState,
         notes: &'a Mutex<Vec<Note>>,
         on_change: F,
+        on_action_change: FA,
         scroll_zoom_state: &'a ScrollZoomState,
         settings: &'a PianoRollSettings
     ) -> Self
         where
             F: 'a + Fn(SequenceChange) -> Message,
+            FA: 'a + Fn(Action) -> Message,
     {
         Self {
             state,
             notes,
             scroll_zoom_state,
             on_change: Box::new(on_change),
+            on_action_change: Box::new(on_action_change),
             settings
         }
     }
@@ -191,14 +195,14 @@ impl<'a, Message> PianoRoll<'a, Message> {
     fn delete_hovered(&mut self, messages: &mut Vec<Message>) {
         match self.state.hover {
             HoverState::None => {
-                self.state.action = Action::Deleting;
+                messages.push((self.on_action_change)(Action::Deleting));
             },
             CanDrag(idx) => {
                 messages.push((self.on_change)(Remove(idx)));
-                self.state.action = Action::Deleting;
+                messages.push((self.on_action_change)(Action::Deleting));
             },
             CanResize(_) => {
-                self.state.action = Action::Deleting;
+                messages.push((self.on_action_change)(Action::Deleting));
             },
             _ => {},
         }
@@ -494,7 +498,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                 }
                 mouse::Event::Input { button: mouse::Button::Left, state: ButtonState::Pressed, } => {
                     if self.state.modifiers.control {
-                        self.state.action = Selecting(cursor_tick, cursor_note);
+                        messages.push((self.on_action_change)(Selecting(cursor_tick, cursor_note)));
                     } else {
                         match self.state.hover {
                             HoverState::OutOfBounds => {}
@@ -505,19 +509,18 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                                     tick = self.settings.tick_grid.quantize_tick(tick);
                                 }
 
-
                                 match self.state.modifiers.shift {
                                     true => {
                                         let length = match self.state.modifiers.alt {
                                             true => 0,
                                             false => self.settings.tick_grid.grid_size(tick),
                                         };
-                                        self.state.action = Resizing(notes.len(), cursor_tick - tick);
+                                        messages.push((self.on_action_change)(Resizing(notes.len(), cursor_tick - tick)));
                                         let note = Note { tick, pitch: cursor_note.clone(), length };
                                         messages.push( (self.on_change)(Add(note)));
                                     }
                                     false => {
-                                        self.state.action = Dragging(notes.len(), cursor_tick - tick);
+                                        messages.push((self.on_action_change)(Dragging(notes.len(), cursor_tick - tick)));
                                         let note = Note { tick, pitch: cursor_note.clone(), length: 32 };
                                         messages.push( (self.on_change)(Add(note)));
                                     }
@@ -527,14 +530,14 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                             },
                             CanDrag(idx) => {
                                 let note = &notes[idx];
-                                self.state.action = Dragging(idx, cursor_tick - note.tick);
+                                messages.push((self.on_action_change)(Dragging(idx, cursor_tick - note.tick)));
                                 if !self.state.selection.contains(&idx) {
                                     self.state.selection.clear();
                                 }
                             },
                             CanResize(idx) => {
                                 let note = &notes[idx];
-                                self.state.action = Resizing(idx, cursor_tick - note.tick - note.length);
+                                messages.push((self.on_action_change)(Resizing(idx, cursor_tick - note.tick - note.length)));
                                 if !self.state.selection.contains(&idx) {
                                     self.state.selection.clear();
                                 }
@@ -542,15 +545,13 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                         }
                     } }
                 mouse::Event::Input { button: mouse::Button::Right, state: ButtonState::Pressed, } => {
-                    //TODO prevent doubling up on deletes
-                    self.state.action = Action::Deleting;
-
+                    self.delete_hovered(messages);
                 }
                 mouse::Event::Input { button: mouse::Button::Left, state: ButtonState::Released, } => {
-                    self.state.action = Action::None;
+                    messages.push((self.on_action_change)(Action::None));
                 }
                 mouse::Event::Input { button: mouse::Button::Right, state: ButtonState::Released, } => {
-                    self.state.action = Action::None;
+                    messages.push((self.on_action_change)(Action::None));
                 }
                 _ => {}
             }

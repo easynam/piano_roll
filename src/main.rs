@@ -10,6 +10,7 @@ use iced_native::widget::button;
 use std::sync::mpsc::SyncSender;
 use crate::audio::{Command, Synth};
 use std::thread;
+use crate::widgets::piano_roll::Action;
 
 mod audio;
 mod sequence;
@@ -22,7 +23,7 @@ pub fn main() {
 }
 
 struct App {
-    piano_roll_1: piano_roll::PianoRollState,
+    piano_roll: piano_roll::PianoRollState,
     scroll_zoom: ScrollZoomState,
     scroll_bar: ScrollZoomBarState,
     scroll_bar_2: ScrollZoomBarState,
@@ -38,6 +39,7 @@ enum Message {
     Sequence(SequenceChange),
     Scroll(ScrollScaleAxisChange),
     Scroll2(ScrollScaleAxisChange),
+    PianoRoll(Action),
     Play,
     Stop,
 }
@@ -58,7 +60,7 @@ impl Sandbox for App {
         }
 
         App {
-            piano_roll_1: piano_roll::PianoRollState::new(),
+            piano_roll: piano_roll::PianoRollState::new(),
             scroll_zoom:ScrollZoomState {
                 x: ScrollScaleAxis::new(0.0,32.0*32.0, 0.0, 32.0*32.0*4.0),
                 y: ScrollScaleAxis::new(-1.5*200.0, 3.0*200.0, -4.0*200.0, 8.0*200.0),
@@ -107,13 +109,16 @@ impl Sandbox for App {
             Message::Stop => {
                 self.synth_channel.try_send(Command::Stop);
             },
+            Message::PianoRoll(action) => {
+                self.piano_roll.action = action;
+            }
         }
     }
 
     fn view(&mut self) -> Element<Self::Message> {
         Column::new()
             .push(Container::new(
-                PianoRoll::new(&mut self.piano_roll_1, self.notes.as_ref(), Message::Sequence, &self.scroll_zoom, &self.settings))
+                PianoRoll::new(&mut self.piano_roll, self.notes.as_ref(), Message::Sequence, Message::PianoRoll, &self.scroll_zoom, &self.settings))
                 .max_height(600)
             )
             .push(Container::new(
