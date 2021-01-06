@@ -495,14 +495,19 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                                     tick = self.settings.tick_grid.quantize_tick(tick);
                                 }
 
-                                let note = Note {
-                                    tick,
-                                    pitch: cursor_note.clone(),
-                                    length: 32,
+                                match self.state.modifiers.shift {
+                                    true => {
+                                        self.state.action = Resizing(notes.len(), cursor_tick - tick);
+                                        let note = Note { tick, pitch: cursor_note.clone(), length: 0 };
+                                        messages.push( (self.on_change)(Add(note)));
+                                    }
+                                    false => {
+                                        self.state.action = Dragging(notes.len(), cursor_tick - tick);
+                                        let note = Note { tick, pitch: cursor_note.clone(), length: 32 };
+                                        messages.push( (self.on_change)(Add(note)));
+                                    }
                                 };
 
-                                messages.push( (self.on_change)(Add(note)));
-                                self.state.action = Dragging(notes.len(), cursor_tick - tick);
                                 self.state.selection.clear();
                             },
                             CanDrag(idx) => {
