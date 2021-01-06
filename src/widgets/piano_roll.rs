@@ -427,14 +427,15 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
 
                                 // todo: optional mode for irregular grids?
                                 for (note_id, note) in selected_notes {
-                                    messages.push( (self.on_change)(Update(
-                                        note_id,
-                                        Note {
-                                            tick: note.tick + tick_offset,
-                                            pitch: note.pitch.clone() + note_offset.clone(),
-                                            ..*note
-                                        }
-                                    )));
+                                    let new_note = Note {
+                                        tick: note.tick + tick_offset,
+                                        pitch: note.pitch.clone() + note_offset.clone(),
+                                        ..*note
+                                    };
+
+                                    if note != &new_note {
+                                        messages.push( (self.on_change)(Update(note_id, new_note)));
+                                    }
                                 }
                             }
                         },
@@ -455,13 +456,14 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                                 let length_offset =  max(-min_length, length - note.length);
 
                                 for (note_id, note) in selected_notes {
-                                    messages.push( (self.on_change)(Update(
-                                        note_id,
-                                        Note {
-                                            length: note.length + length_offset,
-                                            ..note.clone()
-                                        }
-                                    )));
+                                    let new_note = Note {
+                                        length: note.length + length_offset,
+                                        ..note.clone()
+                                    };
+
+                                    if note != &new_note {
+                                        messages.push( (self.on_change)(Update(note_id, new_note)));
+                                    }
                                 }
                             }
                         },
