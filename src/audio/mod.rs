@@ -8,13 +8,13 @@ mod source;
 
 use std::{
     sync::{
-        mpsc::{sync_channel, Receiver, SyncSender},
         Arc, Mutex,
     },
     thread,
     time::Duration,
 };
 
+use iced::futures::channel::mpsc::{Receiver, Sender, channel};
 use source::FxSource;
 
 use crate::sequence::{Sequence, Pitch};
@@ -25,6 +25,7 @@ use self::{
 
 #[derive(Debug, Clone)]
 pub enum Command {
+    SetNotes(Arc<Mutex<Sequence>>),
     Play,
     Stop,
     StartPreview(Pitch),
@@ -33,22 +34,36 @@ pub enum Command {
 
 #[derive(Debug, Clone)]
 pub enum Status {
+    CommandChannel(Sender<Command>),
     PlaybackCursorUpdated(Option<f64>),
 }
 
 pub struct Synth {
     recv: Receiver<Command>,
-    send: SyncSender<Status>,
+    send: Sender<Status>,
 }
 
 impl Synth {
-    pub fn create() -> (SyncSender<Command>, Receiver<Status>, Synth) {
-        let (cmd_tx, cmd_rx) = sync_channel(64);
-        let (status_tx, status_rx) = sync_channel(64);
-        (cmd_tx, status_rx, Synth { recv: cmd_rx, send: status_tx })
+    pub fn create() -> (Receiver<Status>, Synth) {
+        let (cmd_tx, cmd_rx) = channel(64);
+        let (mut status_tx, status_rx) = channel(64);
+        status_tx.try_send(Status::CommandChannel(cmd_tx));
+        (status_rx, Synth { recv: cmd_rx, send: status_tx })
     }
 
-    pub fn run(self, notes: Arc<Mutex<Sequence>>) {
+    pub fn run(mut self) {
+        let notes;
+
+        loop {
+            match self.recv.try_next() {
+                Ok(Some(Command::SetNotes(n))) => {
+                    notes = n;
+                    break;
+                }
+                _ => {},
+            }
+        }
+
         let mut cursor_pos = None;
         let mut emitter = AudioEmitter::new();
         let config = emitter.get_config();
@@ -60,12 +75,13 @@ impl Synth {
         emitter.start(Box::new(fxsource));
 
         loop {
-            while let Ok(command) = self.recv.try_recv() {
+            while let Ok(Some(command)) = self.recv.try_next() {
                 match command {
                     Command::Play => player.play(emitter.get_sample_pos()),
                     Command::Stop => player.stop(),
                     Command::StartPreview(pitch) => player.play_preview(pitch),
                     Command::StopPreview => player.stop_preview(),
+                    Command::SetNotes(_) => panic!("SetNotes after init")
                 }
             }
 

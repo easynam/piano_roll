@@ -1,14 +1,13 @@
 use audio::Status;
-use iced::{Application, Column, Element, Error, Row, Settings};
+use iced::{Application, Column, Element, Error, Row, Settings, Subscription, futures::{self, channel::mpsc::Sender}};
 use iced_native::{Container, Button, Text};
 use widgets::piano_roll::{PianoRoll, PianoRollSettings};
-use std::{fmt::Debug, sync::{Arc, Mutex, mpsc::Receiver}};
+use std::{fmt::Debug, sync::{Arc, Mutex}};
 use crate::scroll_zoom::{ScrollZoomState, ScrollScaleAxisChange, ScrollScaleAxis};
 use crate::sequence::{SequenceChange, Sequence, update_sequence};
 use crate::widgets::scroll_bar::{ScrollZoomBarState, Orientation, ScrollZoomBar};
 use widgets::piano_roll;
 use iced_native::widget::button;
-use std::sync::mpsc::SyncSender;
 use crate::audio::{Command, Synth};
 use std::thread;
 use crate::widgets::piano_roll::Action;
@@ -32,8 +31,7 @@ struct App {
     settings: PianoRollSettings,
     play_button: button::State,
     stop_button: button::State,
-    synth_channel: SyncSender<Command>,
-    status_channel: Receiver<Status>,
+    synth_channel: Option<Sender<Command>>,
 }
 
 #[derive(Debug, Clone)]
@@ -43,6 +41,7 @@ enum Message {
     Scroll2(ScrollScaleAxisChange),
     PianoRoll(Action),
     SynthCommand(Command),
+    SynthStatus(Status),
 }
 
 impl Application for App {
@@ -51,17 +50,6 @@ impl Application for App {
     type Flags = ();
 
     fn new(_flags: ()) -> (Self, iced::Command<Message>) {
-        let (synth_channel, status_channel, synth) = Synth::create();
-
-        let notes = Arc::new(Mutex::new(vec!()));
-
-        {
-            let notes = notes.clone();
-            thread::spawn(move|| {
-                synth.run(notes);
-            });
-        }
-
         (
             App {
                 piano_roll: piano_roll::PianoRollState::new(),
@@ -71,12 +59,11 @@ impl Application for App {
                 },
                 scroll_bar: ScrollZoomBarState::new(),
                 scroll_bar_2: ScrollZoomBarState::new(),
-                notes,
+                notes: Arc::new(Mutex::new(Vec::new())),
                 settings: PianoRollSettings::default(),
                 play_button: button::State::new(),
                 stop_button: button::State::new(),
-                synth_channel,
-                status_channel,
+                synth_channel: None,
             },
             iced::Command::none(),
         )
@@ -111,10 +98,21 @@ impl Application for App {
                 _ => {}
             },
             Message::SynthCommand(command) => {
-                self.synth_channel.try_send(command);
+                if let Some(channel) = self.synth_channel.as_mut() {
+                    channel.try_send(command);
+                }
             },
             Message::PianoRoll(action) => {
                 self.piano_roll.action = action;
+            }
+            Message::SynthStatus(status) => match status {
+                Status::CommandChannel(mut channel) => {
+                    channel.try_send(Command::SetNotes(self.notes.clone()));
+                    self.synth_channel = Some(channel);
+                },
+                Status::PlaybackCursorUpdated(_pos) => {
+                    println!("pos: {:?}", _pos);
+                }
             }
         }
         iced::Command::none()
@@ -150,5 +148,36 @@ impl Application for App {
             )
             .padding(40)
             .into()
+    }
+
+    fn subscription(&self) -> Subscription<Self::Message> {
+        Subscription::from_recipe(SynthThread("main synth thread")).map(|x| Message::SynthStatus(x))
+    }
+}
+
+struct SynthThread(&'static str);
+
+impl<H, I> iced_native::subscription::Recipe<H, I> for SynthThread
+where
+    H: std::hash::Hasher,
+{
+    type Output = Status;
+
+    fn hash(&self, state: &mut H) {
+        use std::hash::Hash;
+
+        std::any::TypeId::of::<Self>().hash(state);
+        self.0.hash(state);
+    }
+
+    fn stream(
+        self: Box<Self>,
+        _input: futures::stream::BoxStream<'static, I>,
+    ) -> futures::stream::BoxStream<'static, Self::Output> {
+        let (status_channel, synth) = Synth::create();
+        thread::spawn(move|| {
+            synth.run();
+        });
+        Box::pin(status_channel)
     }
 }
