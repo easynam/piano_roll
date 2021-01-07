@@ -527,6 +527,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                                         };
                                         messages.push((self.on_action_change)(Resizing(notes.len(), cursor_tick - tick)));
                                         let note = Note { tick, pitch: cursor_note.clone(), length };
+                                        messages.push((self.on_synth_command)(Command::StartPreview(note.pitch.clone())));
                                         messages.push( (self.on_change)(Add(note)));
                                     }
                                     false => {
