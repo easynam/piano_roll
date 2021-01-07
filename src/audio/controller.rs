@@ -2,6 +2,7 @@ use crate::sequence::Pitch;
 
 pub struct Event {
     pub sample: usize,
+    pub sequence: usize,
     pub data: EventData,
 }
 

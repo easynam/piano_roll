@@ -2,7 +2,10 @@ use std::{fmt::Display, path::Path, sync::Arc};
 
 use crossbeam::queue::SegQueue;
 
-use super::{controller::{Controller, Event, EventData}, source::Source};
+use super::{
+    controller::{Controller, Event, EventData},
+    source::Source,
+};
 
 pub struct RedoxSynthController {
     event_queue: Arc<SegQueue<Event>>,
@@ -14,17 +17,23 @@ pub struct RedoxSynthSource {
     event_queue: Arc<SegQueue<Event>>,
 }
 
-pub struct RedoxSynthGenerator {
+pub struct RedoxSynthGenerator {}
+
+fn redoxsynth_error<T: Display>(err: T) -> String {
+    format!("RedoxSynth error: {}", err)
 }
 
-fn redoxsynth_error<T: Display>(err: T) -> String { format!("RedoxSynth error: {}", err) }
-
 impl RedoxSynthGenerator {
-    pub fn new<P: AsRef<Path>>(sample_rate: f32, soundfont_filename: P) -> Result<(RedoxSynthController, RedoxSynthSource), String> {
+    pub fn new<P: AsRef<Path>>(
+        sample_rate: f32,
+        soundfont_filename: P,
+    ) -> Result<(RedoxSynthController, RedoxSynthSource), String> {
         let settings = redoxsynth::Settings::new().map_err(redoxsynth_error)?;
         let mut synth = redoxsynth::Synth::new(settings).map_err(redoxsynth_error)?;
         synth.set_sample_rate(sample_rate);
-        synth.sfload(soundfont_filename, true).map_err(redoxsynth_error)?;
+        synth
+            .sfload(soundfont_filename, true)
+            .map_err(redoxsynth_error)?;
 
         let event_queue = Arc::new(SegQueue::new());
         Ok((
@@ -36,9 +45,7 @@ impl RedoxSynthGenerator {
 
 impl RedoxSynthController {
     fn new(event_queue: Arc<SegQueue<Event>>) -> Self {
-        Self {
-            event_queue
-        }
+        Self { event_queue }
     }
 }
 
@@ -58,8 +65,11 @@ impl RedoxSynthSource {
     }
 
     fn insert_event(&mut self, event: Event) {
-        let pos = self.events
-            .binary_search_by_key(&event.sample, |e: &Event| e.sample)
+        let pos = self
+            .events
+            .binary_search_by_key(&(event.sample, event.sequence), |e: &Event| {
+                (e.sample, e.sequence)
+            })
             .unwrap_or_else(|e| e);
 
         self.events.insert(pos, event);

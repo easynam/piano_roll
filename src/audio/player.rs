@@ -6,6 +6,7 @@ use super::controller::{Controller, Event, EventData};
 
 pub struct Player {
     notes: Arc<Mutex<Sequence>>,
+    sequence: usize,
     start_sample: usize,
     samples_per_tick: usize,
     controller: Box<dyn Controller>,
@@ -18,6 +19,7 @@ impl Player {
     pub fn new(samples_per_tick: usize, notes: Arc<Mutex<Sequence>>, controller: Box<dyn Controller>) -> Self {
         Self {
             notes,
+            sequence: 0,
             start_sample: 0,
             samples_per_tick,
             controller,
@@ -51,13 +53,17 @@ impl Player {
         if let Some(old_pitch) = &self.preview {
             self.controller.send_event(Event {
                 sample: 0,
+                sequence: self.sequence,
                 data: EventData::NoteOff(1, old_pitch.clone()),
             });
+            self.sequence += 1;
         }
         self.controller.send_event(Event {
             sample: 0,
+            sequence: self.sequence,
             data: EventData::NoteOn(1, pitch.clone()),
         });
+        self.sequence += 1;
 
         self.preview = Some(pitch.clone());
     }
@@ -66,8 +72,10 @@ impl Player {
         if let Some(old_pitch) = &self.preview {
             self.controller.send_event(Event {
                 sample: 0,
+                sequence: self.sequence,
                 data: EventData::NoteOff(1, old_pitch.clone()),
             });
+            self.sequence += 1;
         }
 
         self.preview = None;
@@ -86,12 +94,16 @@ impl Player {
             if start_sample >= self.cursor && start_sample < cursor_end {
                 self.controller.send_event(Event {
                     sample: self.start_sample + start_sample,
+                    sequence: self.sequence,
                     data: EventData::NoteOn(0, note.pitch.clone()),
                 });
+                self.sequence += 1;
                 self.controller.send_event(Event {
                     sample: self.start_sample + end_sample,
+                    sequence: self.sequence,
                     data: EventData::NoteOff(0, note.pitch.clone()),
                 });
+                self.sequence += 1;
             }
         }
 
