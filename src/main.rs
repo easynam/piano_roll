@@ -1,7 +1,8 @@
+use audio::Status;
 use iced::{Application, Column, Element, Error, Row, Settings};
 use iced_native::{Container, Button, Text};
 use widgets::piano_roll::{PianoRoll, PianoRollSettings};
-use std::{fmt::Debug, sync::{Arc, Mutex}};
+use std::{fmt::Debug, sync::{Arc, Mutex, mpsc::Receiver}};
 use crate::scroll_zoom::{ScrollZoomState, ScrollScaleAxisChange, ScrollScaleAxis};
 use crate::sequence::{SequenceChange, Sequence, update_sequence};
 use crate::widgets::scroll_bar::{ScrollZoomBarState, Orientation, ScrollZoomBar};
@@ -32,6 +33,7 @@ struct App {
     play_button: button::State,
     stop_button: button::State,
     synth_channel: SyncSender<Command>,
+    status_channel: Receiver<Status>,
 }
 
 #[derive(Debug, Clone)]
@@ -49,7 +51,7 @@ impl Application for App {
     type Flags = ();
 
     fn new(_flags: ()) -> (Self, iced::Command<Message>) {
-        let (synth_channel, synth) = Synth::create();
+        let (synth_channel, status_channel, synth) = Synth::create();
 
         let notes = Arc::new(Mutex::new(vec!()));
 
@@ -74,6 +76,7 @@ impl Application for App {
                 play_button: button::State::new(),
                 stop_button: button::State::new(),
                 synth_channel,
+                status_channel,
             },
             iced::Command::none(),
         )

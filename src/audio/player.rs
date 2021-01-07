@@ -35,6 +35,20 @@ impl Player {
         self.playing = true;
     }
 
+    pub fn get_position_at(&self, sample: usize) -> Option<f64> {
+        if !self.playing {
+            return None;
+        }
+
+        if sample < self.start_sample {
+            return Some(0.0);
+        }
+
+        let sample_delta = sample - self.start_sample;
+
+        return Some(sample_delta as f64 / self.samples_per_tick as f64);
+    }
+
     pub fn stop(&mut self) {
         self.playing = false;
     }

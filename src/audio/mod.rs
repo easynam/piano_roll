@@ -31,17 +31,25 @@ pub enum Command {
     StopPreview,
 }
 
+#[derive(Debug, Clone)]
+pub enum Status {
+    PlaybackCursorUpdated(Option<f64>),
+}
+
 pub struct Synth {
     recv: Receiver<Command>,
+    send: SyncSender<Status>,
 }
 
 impl Synth {
-    pub fn create() -> (SyncSender<Command>, Synth) {
-        let (tx, rx) = sync_channel(64);
-        (tx, Synth { recv: rx })
+    pub fn create() -> (SyncSender<Command>, Receiver<Status>, Synth) {
+        let (cmd_tx, cmd_rx) = sync_channel(64);
+        let (status_tx, status_rx) = sync_channel(64);
+        (cmd_tx, status_rx, Synth { recv: cmd_rx, send: status_tx })
     }
 
     pub fn run(self, notes: Arc<Mutex<Sequence>>) {
+        let mut cursor_pos = None;
         let mut emitter = AudioEmitter::new();
         let config = emitter.get_config();
         let (controller, source) = RedoxSynthGenerator::new(config.sample_rate.0 as f32, "gm.sf2")
@@ -60,8 +68,17 @@ impl Synth {
                     Command::StopPreview => player.stop_preview(),
                 }
             }
+
+            let sample_pos = emitter.get_sample_pos();
+            player.process(sample_pos + 4800);
+
+            let new_cursor_pos = player.get_position_at(sample_pos);
+            if cursor_pos != new_cursor_pos {
+                cursor_pos = new_cursor_pos;
+                self.send.try_send(Status::PlaybackCursorUpdated(cursor_pos));
+            }
+
             thread::sleep(Duration::from_millis(10));
-            player.process(emitter.get_sample_pos() + 4800);
         }
     }
 }
