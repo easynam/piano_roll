@@ -1,4 +1,4 @@
-use crate::sequence::Note;
+use crate::sequence::Pitch;
 
 pub struct Event {
     pub sample: usize,
@@ -6,8 +6,8 @@ pub struct Event {
 }
 
 pub enum EventData {
-    NoteOn(Note),
-    NoteOff(Note),
+    NoteOn(u32, Pitch),
+    NoteOff(u32, Pitch),
 }
 
 pub trait Controller {

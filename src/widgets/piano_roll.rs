@@ -15,6 +15,7 @@ use iced_native::input::keyboard::ModifiersState;
 use std::cmp::min;
 use crate::widgets::pitch_grid::{PitchGrid, TetGrid};
 use crate::widgets::pitch_grid;
+use crate::audio::Command;
 
 const DEFAULT_OCTAVE_HEIGHT: f32 = 200.0;
 const DEFAULT_TICK_WIDTH: f32 = 1.0;
@@ -24,6 +25,7 @@ pub struct PianoRoll<'a, Message> {
     notes: &'a Mutex<Sequence>,
     on_change: Box<dyn Fn(SequenceChange) -> Message + 'a>,
     on_action_change: Box<dyn Fn(Action) -> Message + 'a>,
+    on_synth_command: Box<dyn Fn(Command) -> Message + 'a>,
     scroll_zoom_state: &'a ScrollZoomState,
     settings: &'a PianoRollSettings,
 }
@@ -96,17 +98,19 @@ impl PianoRollState {
 }
 
 impl<'a, Message> PianoRoll<'a, Message> {
-    pub fn new<F, FA>(
+    pub fn new<F, FA, FS>(
         state: &'a mut PianoRollState,
         notes: &'a Mutex<Vec<Note>>,
         on_change: F,
         on_action_change: FA,
+        on_synth_command: FS,
         scroll_zoom_state: &'a ScrollZoomState,
         settings: &'a PianoRollSettings
     ) -> Self
         where
             F: 'a + Fn(SequenceChange) -> Message,
             FA: 'a + Fn(Action) -> Message,
+            FS: 'a + Fn(Command) -> Message,
     {
         Self {
             state,
@@ -114,6 +118,7 @@ impl<'a, Message> PianoRoll<'a, Message> {
             scroll_zoom_state,
             on_change: Box::new(on_change),
             on_action_change: Box::new(on_action_change),
+            on_synth_command: Box::new(on_synth_command),
             settings
         }
     }
@@ -438,7 +443,10 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                                     };
 
                                     if note != &new_note {
-                                        messages.push( (self.on_change)(Update(note_id, new_note)));
+                                        messages.push( (self.on_change)(Update(note_id, new_note.clone())));
+                                    }
+                                    if &note.pitch != &new_note.pitch {
+                                        messages.push((self.on_synth_command)(Command::StartPreview(new_note.pitch.clone())));
                                     }
                                 }
                             }
@@ -522,6 +530,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                                     false => {
                                         messages.push((self.on_action_change)(Dragging(notes.len(), cursor_tick - tick)));
                                         let note = Note { tick, pitch: cursor_note.clone(), length: 32 };
+                                        messages.push((self.on_synth_command)(Command::StartPreview(note.pitch.clone())));
                                         messages.push( (self.on_change)(Add(note)));
                                     }
                                 };
@@ -531,6 +540,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                             CanDrag(idx) => {
                                 let note = &notes[idx];
                                 messages.push((self.on_action_change)(Dragging(idx, cursor_tick - note.tick)));
+                                messages.push((self.on_synth_command)(Command::StartPreview(note.pitch.clone())));
                                 if !self.state.selection.contains(&idx) {
                                     self.state.selection.clear();
                                 }
@@ -549,9 +559,11 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                 }
                 mouse::Event::Input { button: mouse::Button::Left, state: ButtonState::Released, } => {
                     messages.push((self.on_action_change)(Action::None));
+                    messages.push((self.on_synth_command)(Command::StopPreview));
                 }
                 mouse::Event::Input { button: mouse::Button::Right, state: ButtonState::Released, } => {
                     messages.push((self.on_action_change)(Action::None));
+                    messages.push((self.on_synth_command)(Command::StopPreview));
                 }
                 _ => {}
             }

@@ -40,8 +40,7 @@ enum Message {
     Scroll(ScrollScaleAxisChange),
     Scroll2(ScrollScaleAxisChange),
     PianoRoll(Action),
-    Play,
-    Stop,
+    SynthCommand(Command),
 }
 
 impl Sandbox for App {
@@ -103,11 +102,8 @@ impl Sandbox for App {
                 },
                 _ => {}
             },
-            Message::Play => {
-                self.synth_channel.try_send(Command::Play);
-            },
-            Message::Stop => {
-                self.synth_channel.try_send(Command::Stop);
+            Message::SynthCommand(command) => {
+                self.synth_channel.try_send(command);
             },
             Message::PianoRoll(action) => {
                 self.piano_roll.action = action;
@@ -119,7 +115,7 @@ impl Sandbox for App {
         Column::new()
             .push(Row::new()
                 .push(Container::new(
-                    PianoRoll::new(&mut self.piano_roll, self.notes.as_ref(), Message::Sequence, Message::PianoRoll, &self.scroll_zoom, &self.settings))
+                    PianoRoll::new(&mut self.piano_roll, self.notes.as_ref(), Message::Sequence, Message::PianoRoll, Message::SynthCommand, &self.scroll_zoom, &self.settings))
                     .max_width(800)
                     .max_height(600))
                 .push(Container::new(
@@ -139,9 +135,9 @@ impl Sandbox for App {
             )
             .push(Row::new()
                 .push(Button::new(&mut self.play_button, Text::new("Play"))
-                    .on_press(Message::Play))
+                    .on_press(Message::SynthCommand(Command::Play)))
                 .push(Button::new(&mut self.stop_button, Text::new("Stop"))
-                    .on_press(Message::Stop))
+                    .on_press(Message::SynthCommand(Command::Stop)))
             )
             .padding(40)
             .into()

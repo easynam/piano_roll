@@ -17,15 +17,18 @@ use std::{
 
 use source::FxSource;
 
-use crate::sequence::Sequence;
+use crate::sequence::{Sequence, Pitch};
 
 use self::{
     audio_emitter::AudioEmitter, effect::Delay, player::Player, redoxsynth::RedoxSynthGenerator,
 };
 
+#[derive(Debug, Clone)]
 pub enum Command {
     Play,
     Stop,
+    StartPreview(Pitch),
+    StopPreview,
 }
 
 pub struct Synth {
@@ -53,6 +56,8 @@ impl Synth {
                 match command {
                     Command::Play => player.play(emitter.get_sample_pos()),
                     Command::Stop => player.stop(),
+                    Command::StartPreview(pitch) => player.play_preview(pitch),
+                    Command::StopPreview => player.stop_preview(),
                 }
             }
             thread::sleep(Duration::from_millis(10));
