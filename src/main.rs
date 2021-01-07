@@ -1,4 +1,4 @@
-use iced::{Element, Settings, Sandbox, Column, Row, Error};
+use iced::{Application, Column, Element, Error, Row, Settings};
 use iced_native::{Container, Button, Text};
 use widgets::piano_roll::{PianoRoll, PianoRollSettings};
 use std::{fmt::Debug, sync::{Arc, Mutex}};
@@ -43,10 +43,12 @@ enum Message {
     SynthCommand(Command),
 }
 
-impl Sandbox for App {
+impl Application for App {
+    type Executor = iced::executor::Default;
     type Message = Message;
+    type Flags = ();
 
-    fn new() -> Self {
+    fn new(_flags: ()) -> (Self, iced::Command<Message>) {
         let (synth_channel, synth) = Synth::create();
 
         let notes = Arc::new(Mutex::new(vec!()));
@@ -58,27 +60,30 @@ impl Sandbox for App {
             });
         }
 
-        App {
-            piano_roll: piano_roll::PianoRollState::new(),
-            scroll_zoom:ScrollZoomState {
-                x: ScrollScaleAxis::new(0.0,32.0*32.0, 0.0, 32.0*32.0*4.0),
-                y: ScrollScaleAxis::new(-1.5*200.0, 3.0*200.0, -4.0*200.0, 8.0*200.0),
+        (
+            App {
+                piano_roll: piano_roll::PianoRollState::new(),
+                scroll_zoom:ScrollZoomState {
+                    x: ScrollScaleAxis::new(0.0,32.0*32.0, 0.0, 32.0*32.0*4.0),
+                    y: ScrollScaleAxis::new(-1.5*200.0, 3.0*200.0, -4.0*200.0, 8.0*200.0),
+                },
+                scroll_bar: ScrollZoomBarState::new(),
+                scroll_bar_2: ScrollZoomBarState::new(),
+                notes,
+                settings: PianoRollSettings::default(),
+                play_button: button::State::new(),
+                stop_button: button::State::new(),
+                synth_channel,
             },
-            scroll_bar: ScrollZoomBarState::new(),
-            scroll_bar_2: ScrollZoomBarState::new(),
-            notes,
-            settings: PianoRollSettings::default(),
-            play_button: button::State::new(),
-            stop_button: button::State::new(),
-            synth_channel,
-        }
+            iced::Command::none(),
+        )
     }
 
     fn title(&self) -> String {
         "wow".to_string()
     }
 
-    fn update(&mut self, message: Self::Message) {
+    fn update(&mut self, message: Self::Message) -> iced::Command<Message> {
         match message {
             Message::Sequence(change) => {
                 let mut notes = self.notes.lock().unwrap();
@@ -109,6 +114,7 @@ impl Sandbox for App {
                 self.piano_roll.action = action;
             }
         }
+        iced::Command::none()
     }
 
     fn view(&mut self) -> Element<Self::Message> {
