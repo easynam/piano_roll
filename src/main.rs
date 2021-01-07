@@ -110,8 +110,8 @@ impl Application for App {
                     channel.try_send(Command::SetNotes(self.notes.clone()));
                     self.synth_channel = Some(channel);
                 },
-                Status::PlaybackCursorUpdated(_pos) => {
-                    println!("pos: {:?}", _pos);
+                Status::PlaybackCursorUpdated(pos) => {
+                    self.piano_roll.cursor = pos;
                 }
             }
         }

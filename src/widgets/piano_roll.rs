@@ -33,6 +33,7 @@ pub struct PianoRoll<'a, Message> {
 
 pub struct PianoRollState {
     pub(crate) action: Action,
+    pub(crate) cursor: Option<f64>,
     hover: HoverState,
     modifiers: Modifiers,
     selection: Vec<usize>,
@@ -85,6 +86,7 @@ impl Default for PianoRollState {
     fn default() -> Self {
         PianoRollState {
             action: Action::None,
+            cursor: None,
             hover: HoverState::None,
             modifiers: Modifiers::default(),
             selection: vec![],
@@ -214,6 +216,24 @@ impl<'a, Message> PianoRoll<'a, Message> {
         }
     }
 
+    fn draw_cursor(&self, bounds: Rectangle) -> Vec<Primitive> {
+        self.state.cursor.iter().map(|pos| {
+            let x = *pos as f32 * DEFAULT_TICK_WIDTH * self.scroll_zoom_state.x.scale(bounds.width);
+            Primitive::Quad {
+                bounds: Rectangle {
+                    x: (x - self.scroll_zoom_state.x.view_start * self.scroll_zoom_state.x.scale(bounds.width) + bounds.x).round(),
+                    y: bounds.y,
+                    width: 1.0,
+                    height: bounds.height
+                },
+                background: Background::Color(Color::from_rgba(1.0, 1.0, 1.0, 0.5)),
+                border_radius: 0.0,
+                border_width: 0.0,
+                border_color: Color::BLACK
+            }
+        }).collect()
+    }
+
     fn draw_tick_grid(&self, bounds: Rectangle) -> Vec<Primitive> {
         let lines = {
             let grid = self.settings.tick_grid.get_grid_lines((self.scroll_zoom_state.x.view_start / DEFAULT_TICK_WIDTH) as i32, (self.scroll_zoom_state.x.view_end / DEFAULT_TICK_WIDTH) as i32);
@@ -321,6 +341,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
         let cursor_tick = (inner_cursor.x / DEFAULT_TICK_WIDTH) as i32;
         let cursor_note = Pitch::new(-(12.0 * inner_cursor.y / DEFAULT_OCTAVE_HEIGHT).round() as i32, 12);
 
+        let cursor_lines = self.draw_cursor(bounds);
         let tick_grid_lines = self.draw_tick_grid(bounds);
         let pitch_grid_lines = self.draw_pitch_grid(bounds);
 
@@ -355,6 +376,9 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                         }
                     })
                     .collect()
+            },
+            Primitive::Group {
+                primitives: cursor_lines,
             },
         ];
 
