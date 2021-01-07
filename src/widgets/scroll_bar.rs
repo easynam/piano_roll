@@ -1,10 +1,11 @@
 use crate::scroll_zoom::{ScrollScaleAxis, ScrollScaleAxisChange};
-use iced_native::{Widget, Hasher, Layout, Length, Point, MouseCursor, Background, Event, Clipboard, Rectangle, Color};
+use iced_native::{Widget, Hasher, Layout, Length, Point, Background, Event, Clipboard, Rectangle, Color, mouse};
+use iced_native::event::Status;
 use iced_native::layout::{Limits, Node};
 use iced_wgpu::{Renderer, Defaults, Primitive};
-use iced_native::input::{mouse, ButtonState};
 use crate::helpers::{PointHelpers, RectangleHelpers};
 use iced::Element;
+use iced_native::mouse::Interaction;
 
 pub struct ScrollZoomBarState {
     action: Action,
@@ -128,10 +129,10 @@ impl<'a, Message> ScrollZoomBar<'a, Message> {
         }
     }
 
-    fn resize_cursor(&self) -> MouseCursor {
+    fn resize_cursor(&self) -> Interaction {
         match self.orientation {
-            Orientation::Horizontal => MouseCursor::ResizingHorizontally,
-            Orientation::Vertical => MouseCursor::ResizingVertically,
+            Orientation::Horizontal => Interaction::ResizingHorizontally,
+            Orientation::Vertical => Interaction::ResizingVertically,
         }
     }
 }
@@ -155,7 +156,8 @@ impl<'a, Message> Widget<Message, Renderer> for ScrollZoomBar<'a, Message> {
         _defaults: &Defaults,
         layout: Layout<'_>,
         _cursor_position: Point,
-    ) -> (Primitive, MouseCursor) {
+        _viewport: &Rectangle,
+    ) -> (Primitive, Interaction) {
         let bounds = layout.bounds();
 
         (
@@ -164,27 +166,27 @@ impl<'a, Message> Widget<Message, Renderer> for ScrollZoomBar<'a, Message> {
                     Primitive::Quad {
                         bounds,
                         background: Background::Color(Color::from_rgb(0.2, 0.2, 0.2)),
-                        border_radius: 0,
-                        border_width: 0,
+                        border_radius: 0.0,
+                        border_width: 0.0,
                         border_color: Color::BLACK,
                     },
                     Primitive::Quad {
                         bounds: self.bar_rect(&bounds),
                         background: Background::Color(Color::from_rgb(0.8, 0.8, 0.8)),
-                        border_radius: 0,
-                        border_width: 1,
+                        border_radius: 0.0,
+                        border_width: 1.0,
                         border_color: Color::BLACK,
                     },
                 ]
             },
             match self.state.action {
-                Action::Dragging( .. ) => MouseCursor::Grabbing,
+                Action::Dragging( .. ) => Interaction::Grabbing,
                 Action::ResizingRight( .. ) => self.resize_cursor(),
                 Action::ResizingLeft( .. ) => self.resize_cursor(),
                 Action::None => match self.state.hover {
-                    HoverState::None => MouseCursor::Idle,
-                    HoverState::OutOfBounds => MouseCursor::OutOfBounds,
-                    HoverState::CanDrag => MouseCursor::Grab,
+                    HoverState::None => Interaction::Idle,
+                    HoverState::OutOfBounds => Interaction::default(),
+                    HoverState::CanDrag => Interaction::Grab,
                     HoverState::CanResizeRight => self.resize_cursor(),
                     HoverState::CanResizeLeft => self.resize_cursor(),
                 }
@@ -196,14 +198,14 @@ impl<'a, Message> Widget<Message, Renderer> for ScrollZoomBar<'a, Message> {
         // use std::hash::Hash;
     }
 
-    fn on_event(&mut self, _event: Event, layout: Layout<'_>, cursor_position: Point, messages: &mut Vec<Message>, _renderer: &Renderer, _clipboard: Option<&dyn Clipboard>) {
+    fn on_event(&mut self, event: Event, layout: Layout<'_>, cursor_position: Point, messages: &mut Vec<Message>, _renderer: &Renderer, _clipboard: Option<&dyn Clipboard>) -> Status {
         let bounds = layout.bounds();
         let cursor_offset = match self.orientation {
             Orientation::Horizontal => cursor_position.normalize_within_bounds(&bounds).x,
             Orientation::Vertical => cursor_position.normalize_within_bounds(&bounds).y,
         };
 
-        match _event {
+        match event {
             Event::Mouse(mouse_event) => match mouse_event {
                 mouse::Event::CursorMoved { .. } => {
                     match self.state.action {
@@ -260,7 +262,7 @@ impl<'a, Message> Widget<Message, Renderer> for ScrollZoomBar<'a, Message> {
                         }
                     }
                 }
-                mouse::Event::Input { button: mouse::Button::Left, state: ButtonState::Pressed, } => {
+                mouse::Event::ButtonPressed(mouse::Button::Left) => {
                     match self.state.hover {
                         HoverState::CanDrag => self.state.action = Action::Dragging(cursor_offset - self.axis.start_proportion()),
                         HoverState::CanResizeRight => self.state.action = Action::ResizingRight(cursor_offset - self.axis.start_proportion() - self.axis.view_proportion()),
@@ -268,13 +270,15 @@ impl<'a, Message> Widget<Message, Renderer> for ScrollZoomBar<'a, Message> {
                         _ => {}
                     }
                 }
-                mouse::Event::Input { button: mouse::Button::Left, state: ButtonState::Released, } => {
+                mouse::Event::ButtonReleased(mouse::Button::Left) => {
                     self.state.action = Action::None;
                 }
                 _ => {}
             },
             _ => {}
-        }
+        };
+
+        Status::Captured
     }
 }
 

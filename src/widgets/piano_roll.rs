@@ -1,8 +1,7 @@
-use iced_native::{Rectangle, Point, Widget, Hasher, Layout, Length, Event, Clipboard, MouseCursor, Background, Color, Vector};
+use iced_native::{Rectangle, Point, Widget, Hasher, Layout, Length, Event, Clipboard, mouse, keyboard, Background, Color, Vector};
 use iced_native::layout::{Node, Limits};
 use iced_wgpu::{Renderer, Primitive, Defaults};
 use std::{cmp::max, sync::Mutex};
-use iced_native::input::{mouse, keyboard, ButtonState};
 use crate::widgets::piano_roll::Action::{Dragging, Resizing, Selecting};
 use iced::Element;
 use crate::widgets::piano_roll::HoverState::{CanDrag, CanResize, OutOfBounds};
@@ -11,11 +10,13 @@ use crate::helpers::RectangleHelpers;
 use crate::sequence::{Note, Sequence, SequenceChange, Pitch};
 use crate::sequence::SequenceChange::{Update, Add, Remove};
 use crate::widgets::tick_grid::{TickGrid, SimpleGrid, LineType};
-use iced_native::input::keyboard::ModifiersState;
 use std::cmp::min;
 use crate::widgets::pitch_grid::{PitchGrid, TetGrid};
 use crate::widgets::pitch_grid;
 use crate::audio::Command;
+use iced_native::mouse::Interaction;
+use iced_native::event::Status;
+use iced_native::keyboard::Modifiers;
 
 const DEFAULT_OCTAVE_HEIGHT: f32 = 200.0;
 const DEFAULT_TICK_WIDTH: f32 = 1.0;
@@ -33,7 +34,7 @@ pub struct PianoRoll<'a, Message> {
 pub struct PianoRollState {
     pub(crate) action: Action,
     hover: HoverState,
-    modifiers: ModifiersState,
+    modifiers: Modifiers,
     selection: Vec<usize>,
 }
 
@@ -85,7 +86,7 @@ impl Default for PianoRollState {
         PianoRollState {
             action: Action::None,
             hover: HoverState::None,
-            modifiers: ModifiersState::default(),
+            modifiers: Modifiers::default(),
             selection: vec![],
         }
     }
@@ -241,8 +242,8 @@ impl<'a, Message> PianoRoll<'a, Message> {
                             height: bounds.height
                         },
                         background: Background::Color(colour),
-                        border_radius: 0,
-                        border_width: 0,
+                        border_radius: 0.0,
+                        border_width: 0.0,
                         border_color: Color::BLACK
                     }
                 })
@@ -282,8 +283,8 @@ impl<'a, Message> PianoRoll<'a, Message> {
                             height: thickness
                         },
                         background: Background::Color(colour),
-                        border_radius: 0,
-                        border_width: 0,
+                        border_radius: 0.0,
+                        border_width: 0.0,
                         border_color: Color::BLACK
                     }
                 })
@@ -312,7 +313,8 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
         _defaults: &Defaults,
         layout: Layout<'_>,
         cursor_position: Point,
-    ) -> (Primitive, MouseCursor) {
+        _viewport: &Rectangle,
+    ) -> (Primitive, Interaction) {
         let bounds = layout.bounds();
 
         let inner_cursor = self.scroll_zoom_state.screen_to_inner(cursor_position, &bounds);
@@ -326,8 +328,8 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
             Primitive::Quad {
                 bounds,
                 background: Background::Color(Color::from_rgb(0.2,0.2,0.2)),
-                border_radius: 0,
-                border_width: 0,
+                border_radius: 0.0,
+                border_width: 0.0,
                 border_color: Color::BLACK,
             },
             Primitive::Group {
@@ -347,8 +349,8 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                         Primitive::Quad {
                             bounds: self.note_rect(note, bounds),
                             background: Background::Color(colour),
-                            border_radius: 0,
-                            border_width: 1,
+                            border_radius: 0.0,
+                            border_width: 1.0,
                             border_color: Color::BLACK,
                         }
                     })
@@ -361,8 +363,8 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                 Primitive::Quad {
                     bounds: self.selection_rect(*start_tick, start_note, cursor_tick, &cursor_note, &bounds),
                     background: Background::Color(Color::TRANSPARENT),
-                    border_radius: 2,
-                    border_width: 2,
+                    border_radius: 2.0,
+                    border_width: 2.0,
                     border_color: Color::WHITE,
                 }
             )
@@ -377,15 +379,15 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                 })
             },
             match self.state.action {
-                Dragging( .. ) => MouseCursor::Grabbing,
-                Resizing( .. ) => MouseCursor::ResizingHorizontally,
+                Dragging( .. ) => Interaction::Grabbing,
+                Resizing( .. ) => Interaction::ResizingHorizontally,
                 Action::None => match self.state.hover {
-                    HoverState::None => MouseCursor::Idle,
-                    HoverState::OutOfBounds => MouseCursor::OutOfBounds,
-                    HoverState::CanDrag( .. ) => MouseCursor::Grab,
-                    HoverState::CanResize( .. ) => MouseCursor::ResizingHorizontally,
+                    HoverState::None => Interaction::Idle,
+                    HoverState::OutOfBounds => Interaction::default(),
+                    HoverState::CanDrag( .. ) => Interaction::Grab,
+                    HoverState::CanResize( .. ) => Interaction::ResizingHorizontally,
                 },
-                _ => MouseCursor::Idle,
+                _ => Interaction::Idle,
             },
         )
     }
@@ -394,7 +396,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
         // use std::hash::Hash;
     }
 
-    fn on_event(&mut self, event: Event, layout: Layout<'_>, cursor_position: Point, messages: &mut Vec<Message>, _renderer: &Renderer, _clipboard: Option<&dyn Clipboard>) {
+    fn on_event(&mut self, event: Event, layout: Layout<'_>, cursor_position: Point, messages: &mut Vec<Message>, _renderer: &Renderer, _clipboard: Option<&dyn Clipboard>) -> Status {
         let bounds = layout.bounds();
 
         let inner_cursor = self.scroll_zoom_state.screen_to_inner(cursor_position, &bounds);
@@ -504,7 +506,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                         Action::None => { },
                     }
                 }
-                mouse::Event::Input { button: mouse::Button::Left, state: ButtonState::Pressed, } => {
+                mouse::Event::ButtonPressed(mouse::Button::Left) => {
                     if self.state.modifiers.control {
                         messages.push((self.on_action_change)(Selecting(cursor_tick, cursor_note)));
                     } else {
@@ -554,24 +556,22 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                             },
                         }
                     } }
-                mouse::Event::Input { button: mouse::Button::Right, state: ButtonState::Pressed, } => {
+                mouse::Event::ButtonPressed(mouse::Button::Right) => {
                     self.delete_hovered(messages);
                 }
-                mouse::Event::Input { button: mouse::Button::Left, state: ButtonState::Released, } => {
-                    messages.push((self.on_action_change)(Action::None));
-                    messages.push((self.on_synth_command)(Command::StopPreview));
-                }
-                mouse::Event::Input { button: mouse::Button::Right, state: ButtonState::Released, } => {
+                mouse::Event::ButtonReleased( .. ) => {
                     messages.push((self.on_action_change)(Action::None));
                     messages.push((self.on_synth_command)(Command::StopPreview));
                 }
                 _ => {}
             }
-            Event::Keyboard(keyboard::Event::Input { modifiers, .. }) => {
+            Event::Keyboard(keyboard::Event::ModifiersChanged(modifiers)) => {
                 self.state.modifiers = modifiers;
             }
             _ => {}
         }
+
+        Status::Captured
     }
 }
 

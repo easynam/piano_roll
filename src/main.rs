@@ -1,4 +1,4 @@
-use iced::{Element, Settings, Sandbox, Column, Row};
+use iced::{Element, Settings, Sandbox, Column, Row, Error};
 use iced_native::{Container, Button, Text};
 use widgets::piano_roll::{PianoRoll, PianoRollSettings};
 use std::{fmt::Debug, sync::{Arc, Mutex}};
@@ -18,7 +18,7 @@ mod widgets;
 mod scroll_zoom;
 mod helpers;
 
-pub fn main() {
+pub fn main() -> Result<(), Error> {
     App::run(Settings::default())
 }
 
