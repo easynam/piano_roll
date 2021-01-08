@@ -1,3 +1,4 @@
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum LineType {
     Bar,
     Beat,
@@ -37,7 +38,7 @@ impl TickGrid for SimpleGrid {
         return ((tick + self.ticks_per_16th/2) / self.ticks_per_16th) * self.ticks_per_16th;
     }
 
-    fn grid_size(&self, tick: i32) -> i32 {
+    fn grid_size(&self, _tick: i32) -> i32 {
         return self.ticks_per_16th;
     }
 }

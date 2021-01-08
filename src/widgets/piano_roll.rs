@@ -1,22 +1,24 @@
-use iced_native::{Rectangle, Point, Widget, Hasher, Layout, Length, Event, Clipboard, mouse, keyboard, Background, Color, Vector};
-use iced_native::layout::{Node, Limits};
-use iced_wgpu::{Renderer, Primitive, Defaults};
 use std::{cmp::max, sync::Mutex};
-use crate::widgets::piano_roll::Action::{Dragging, Resizing, Selecting};
-use iced::Element;
-use crate::widgets::piano_roll::HoverState::{CanDrag, CanResize, OutOfBounds};
-use crate::scroll_zoom::{ScrollZoomState};
-use crate::helpers::RectangleHelpers;
-use crate::sequence::{Note, Sequence, SequenceChange, Pitch};
-use crate::sequence::SequenceChange::{Update, Add, Remove};
-use crate::widgets::tick_grid::{TickGrid, SimpleGrid, LineType};
 use std::cmp::min;
-use crate::widgets::pitch_grid::{PitchGrid, TetGrid};
-use crate::widgets::pitch_grid;
-use crate::audio::Command;
-use iced_native::mouse::Interaction;
+
+use iced::Element;
+use iced_native::{Background, Clipboard, Color, Event, Hasher, keyboard, Layout, Length, mouse, Point, Rectangle, Vector, Widget};
 use iced_native::event::Status;
 use iced_native::keyboard::Modifiers;
+use iced_native::layout::{Limits, Node};
+use iced_native::mouse::Interaction;
+use iced_wgpu::{Defaults, Primitive, Renderer};
+
+use crate::audio::Command;
+use crate::helpers::RectangleHelpers;
+use crate::scroll_zoom::ScrollZoomState;
+use crate::sequence::{Note, Pitch, Sequence, SequenceChange};
+use crate::sequence::SequenceChange::{Add, Remove, Update};
+use crate::widgets::piano_roll::Action::{Dragging, Resizing, Selecting};
+use crate::widgets::piano_roll::HoverState::{CanDrag, CanResize, OutOfBounds};
+use crate::widgets::pitch_grid::{PitchGrid, TetGrid};
+use crate::widgets::pitch_grid;
+use crate::widgets::tick_grid::{LineType, SimpleGrid, TickGrid};
 
 const DEFAULT_OCTAVE_HEIGHT: f32 = 200.0;
 const DEFAULT_TICK_WIDTH: f32 = 1.0;
@@ -40,7 +42,7 @@ pub struct PianoRollState {
 }
 
 pub struct PianoRollSettings {
-    tick_grid: Box<dyn TickGrid>,
+    pub(crate) tick_grid: Box<dyn TickGrid>,
     pitch_grid: Box<dyn PitchGrid>,
 }
 

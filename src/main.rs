@@ -1,16 +1,20 @@
-use audio::Status;
-use iced::{Application, Column, Element, Error, Row, Settings, Subscription, futures::{self, channel::mpsc::Sender}};
-use iced_native::{Container, Button, Text};
-use widgets::piano_roll::{PianoRoll, PianoRollSettings};
 use std::{fmt::Debug, sync::{Arc, Mutex}};
-use crate::scroll_zoom::{ScrollZoomState, ScrollScaleAxisChange, ScrollScaleAxis};
-use crate::sequence::{SequenceChange, Sequence, update_sequence};
-use crate::widgets::scroll_bar::{ScrollZoomBarState, Orientation, ScrollZoomBar};
-use widgets::piano_roll;
-use iced_native::widget::button;
-use crate::audio::{Command, Synth};
 use std::thread;
+
+use iced::{Application, Column, Element, Error, futures::{self, channel::mpsc::Sender}, Row, Settings, Subscription};
+use iced_native::{Button, Container, Text};
+use iced_native::widget::button;
+
+use audio::Status;
+use widgets::piano_roll::{PianoRoll, PianoRollSettings};
+use widgets::piano_roll;
+
+use crate::audio::{Command, Synth};
+use crate::scroll_zoom::{ScrollScaleAxis, ScrollScaleAxisChange, ScrollZoomState};
+use crate::sequence::{Sequence, SequenceChange, update_sequence};
 use crate::widgets::piano_roll::Action;
+use crate::widgets::scroll_bar::{Orientation, ScrollZoomBar, ScrollZoomBarState};
+use crate::widgets::timeline::Timeline;
 
 mod audio;
 mod sequence;
@@ -120,6 +124,7 @@ impl Application for App {
 
     fn view(&mut self) -> Element<Self::Message> {
         Column::new()
+            .push(Container::new(Timeline::new(&self.scroll_zoom.x, &self.settings)).max_width(800))
             .push(Row::new()
                 .push(Container::new(
                     PianoRoll::new(&mut self.piano_roll, self.notes.as_ref(), Message::Sequence, Message::PianoRoll, Message::SynthCommand, &self.scroll_zoom, &self.settings))
