@@ -36,6 +36,7 @@ struct App {
     play_button: button::State,
     stop_button: button::State,
     synth_channel: Option<Sender<Command>>,
+    playback_cursor: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -68,6 +69,7 @@ impl Application for App {
                 play_button: button::State::new(),
                 stop_button: button::State::new(),
                 synth_channel: None,
+                playback_cursor: 0.0
             },
             iced::Command::none(),
         )
@@ -115,7 +117,7 @@ impl Application for App {
                     self.synth_channel = Some(channel);
                 },
                 Status::PlaybackCursorUpdated(pos) => {
-                    self.piano_roll.cursor = pos;
+                    self.playback_cursor = pos.unwrap_or(0.0) as f32;
                 }
             }
         }
@@ -127,7 +129,7 @@ impl Application for App {
             .push(Container::new(Timeline::new(&self.scroll_zoom.x, &self.settings)).max_width(800))
             .push(Row::new()
                 .push(Container::new(
-                    PianoRoll::new(&mut self.piano_roll, self.notes.as_ref(), Message::Sequence, Message::PianoRoll, Message::SynthCommand, &self.scroll_zoom, &self.settings))
+                    PianoRoll::new(&mut self.piano_roll, self.notes.as_ref(), Message::Sequence, Message::PianoRoll, Message::SynthCommand, &self.scroll_zoom, &self.settings, &self.playback_cursor))
                     .max_width(800)
                     .max_height(600))
                 .push(Container::new(

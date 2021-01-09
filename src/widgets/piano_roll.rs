@@ -31,11 +31,11 @@ pub struct PianoRoll<'a, Message> {
     on_synth_command: Box<dyn Fn(Command) -> Message + 'a>,
     scroll_zoom_state: &'a ScrollZoomState,
     settings: &'a PianoRollSettings,
+    playback_cursor: &'a f32,
 }
 
 pub struct PianoRollState {
     pub(crate) action: Action,
-    pub(crate) cursor: Option<f64>,
     hover: HoverState,
     modifiers: Modifiers,
     selection: Vec<usize>,
@@ -88,7 +88,6 @@ impl Default for PianoRollState {
     fn default() -> Self {
         PianoRollState {
             action: Action::None,
-            cursor: None,
             hover: HoverState::None,
             modifiers: Modifiers::default(),
             selection: vec![],
@@ -110,7 +109,8 @@ impl<'a, Message> PianoRoll<'a, Message> {
         on_action_change: FA,
         on_synth_command: FS,
         scroll_zoom_state: &'a ScrollZoomState,
-        settings: &'a PianoRollSettings
+        settings: &'a PianoRollSettings,
+        playback_cursor: &'a f32,
     ) -> Self
         where
             F: 'a + Fn(SequenceChange) -> Message,
@@ -124,7 +124,8 @@ impl<'a, Message> PianoRoll<'a, Message> {
             on_change: Box::new(on_change),
             on_action_change: Box::new(on_action_change),
             on_synth_command: Box::new(on_synth_command),
-            settings
+            settings,
+            playback_cursor
         }
     }
 
@@ -218,22 +219,20 @@ impl<'a, Message> PianoRoll<'a, Message> {
         }
     }
 
-    fn draw_cursor(&self, bounds: Rectangle) -> Vec<Primitive> {
-        self.state.cursor.iter().map(|pos| {
-            let x = *pos as f32 * DEFAULT_TICK_WIDTH * self.scroll_zoom_state.x.scale(bounds.width);
-            Primitive::Quad {
-                bounds: Rectangle {
-                    x: (x - self.scroll_zoom_state.x.view_start * self.scroll_zoom_state.x.scale(bounds.width) + bounds.x).round(),
-                    y: bounds.y,
-                    width: 1.0,
-                    height: bounds.height
-                },
-                background: Background::Color(Color::from_rgba(1.0, 1.0, 1.0, 0.5)),
-                border_radius: 0.0,
-                border_width: 0.0,
-                border_color: Color::BLACK
-            }
-        }).collect()
+    fn draw_cursor(&self, bounds: Rectangle) -> Primitive {
+        let x = *self.playback_cursor as f32 * DEFAULT_TICK_WIDTH * self.scroll_zoom_state.x.scale(bounds.width);
+        Primitive::Quad {
+            bounds: Rectangle {
+                x: (x - self.scroll_zoom_state.x.view_start * self.scroll_zoom_state.x.scale(bounds.width) + bounds.x).round(),
+                y: bounds.y,
+                width: 1.0,
+                height: bounds.height
+            },
+            background: Background::Color(Color::from_rgba(1.0, 1.0, 1.0, 0.5)),
+            border_radius: 0.0,
+            border_width: 0.0,
+            border_color: Color::BLACK
+        }
     }
 
     fn draw_tick_grid(&self, bounds: Rectangle) -> Vec<Primitive> {
@@ -379,9 +378,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                     })
                     .collect()
             },
-            Primitive::Group {
-                primitives: cursor_lines,
-            },
+            cursor_lines,
         ];
 
         if let Selecting(start_tick, start_note) = &self.state.action {
