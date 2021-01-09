@@ -1,6 +1,6 @@
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum LineType {
-    Bar,
+    Bar(i32),
     Beat,
     InBetween,
 }
@@ -27,7 +27,7 @@ impl TickGrid for SimpleGrid {
             .map(|n| n / self.ticks_per_16th)
             .map(|n| GridLine {
                 tick: n * self.ticks_per_16th,
-                line_type: if n % 16 == 0 { LineType::Bar }
+                line_type: if n % 16 == 0 { LineType::Bar(n/16 + 1) }
                 else if n % 4 == 0 { LineType::Beat }
                 else { LineType::InBetween }
             })

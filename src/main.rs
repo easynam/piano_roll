@@ -140,7 +140,7 @@ impl Application for App {
             )
             .push(Container::new(
                 ScrollZoomBar::new(
-                    &mut self.scroll_bar, &self.scroll_zoom.x, Message::Scroll, Orientation::Horizontal, false
+                    &mut self.scroll_bar, &self.scroll_zoom.x, Message::Scroll, Orientation::Horizontal, true
                 ))
                 .max_width(800)
                 .max_height(20)

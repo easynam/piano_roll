@@ -245,13 +245,13 @@ impl<'a, Message> PianoRoll<'a, Message> {
                     let x = line.tick as f32 * DEFAULT_TICK_WIDTH * self.scroll_zoom_state.x.scale(bounds.width);
 
                     let colour = match line.line_type {
-                        LineType::Bar => Color::from_rgb(0.0, 0.0, 0.0),
+                        LineType::Bar(_) => Color::from_rgb(0.0, 0.0, 0.0),
                         LineType::Beat => Color::from_rgb(0.1, 0.1, 0.1),
                         LineType::InBetween => Color::from_rgb(0.15, 0.15, 0.15),
                     };
 
                     let thickness = match line.line_type {
-                        LineType::Bar => 2.0,
+                        LineType::Bar(_) => 2.0,
                         LineType::Beat => 1.0,
                         LineType::InBetween => 1.0,
                     };
