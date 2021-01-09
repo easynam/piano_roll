@@ -20,9 +20,6 @@ use crate::widgets::pitch_grid::{PitchGrid, TetGrid};
 use crate::widgets::pitch_grid;
 use crate::widgets::tick_grid::{LineType, SimpleGrid, TickGrid};
 
-const DEFAULT_OCTAVE_HEIGHT: f32 = 200.0;
-const DEFAULT_TICK_WIDTH: f32 = 1.0;
-
 pub struct PianoRoll<'a, Message> {
     state: &'a mut PianoRollState,
     notes: &'a Mutex<Sequence>,
@@ -136,22 +133,22 @@ impl<'a, Message> PianoRoll<'a, Message> {
         let to_note = max(start_note, end_note);
 
         let inner = Rectangle {
-            x: from_tick as f32 * DEFAULT_TICK_WIDTH,
-            y: -to_note.to_f32() * DEFAULT_OCTAVE_HEIGHT - DEFAULT_OCTAVE_HEIGHT/24.0,
-            width: (to_tick - from_tick + 1) as f32 * DEFAULT_TICK_WIDTH,
-            height: (to_note.clone() - from_note.clone() + Pitch::new(1, 12)).to_f32() * DEFAULT_OCTAVE_HEIGHT,
+            x: from_tick as f32,
+            y: -to_note.to_f32() - 1.0/24.0,
+            width: (to_tick - from_tick + 1) as f32,
+            height: (to_note.clone() - from_note.clone() + Pitch::new(1, 12)).to_f32(),
         };
 
         self.scroll_zoom_state.inner_rect_to_screen(inner, &bounds)
     }
 
     fn note_rect(&self, note: &Note, bounds: Rectangle,) -> Rectangle {
-        let height = self.scroll_zoom_state.y.scale(bounds.height) * DEFAULT_OCTAVE_HEIGHT / 12.0;
+        let height = self.scroll_zoom_state.y.scale(bounds.height) / 12.0;
 
         Rectangle {
-            x: (note.tick as f32 * DEFAULT_TICK_WIDTH - self.scroll_zoom_state.x.scroll()) * self.scroll_zoom_state.x.scale(bounds.width) + bounds.x,
-            y: (-note.pitch.to_f32() * DEFAULT_OCTAVE_HEIGHT - self.scroll_zoom_state.y.scroll()) * self.scroll_zoom_state.y.scale(bounds.height) + bounds.y - height/2.0,
-            width: note.length as f32 * self.scroll_zoom_state.x.scale(bounds.width) * DEFAULT_TICK_WIDTH,
+            x: (note.tick as f32 - self.scroll_zoom_state.x.scroll()) * self.scroll_zoom_state.x.scale(bounds.width) + bounds.x,
+            y: (-note.pitch.to_f32() - self.scroll_zoom_state.y.scroll()) * self.scroll_zoom_state.y.scale(bounds.height) + bounds.y - height/2.0,
+            width: note.length as f32 * self.scroll_zoom_state.x.scale(bounds.width),
             height,
         }
     }
@@ -220,7 +217,7 @@ impl<'a, Message> PianoRoll<'a, Message> {
     }
 
     fn draw_cursor(&self, bounds: Rectangle) -> Primitive {
-        let x = *self.playback_cursor as f32 * DEFAULT_TICK_WIDTH * self.scroll_zoom_state.x.scale(bounds.width);
+        let x = *self.playback_cursor as f32 * self.scroll_zoom_state.x.scale(bounds.width);
         Primitive::Quad {
             bounds: Rectangle {
                 x: (x - self.scroll_zoom_state.x.view_start * self.scroll_zoom_state.x.scale(bounds.width) + bounds.x).round(),
@@ -237,11 +234,11 @@ impl<'a, Message> PianoRoll<'a, Message> {
 
     fn draw_tick_grid(&self, bounds: Rectangle) -> Vec<Primitive> {
         let lines = {
-            let grid = self.settings.tick_grid.get_grid_lines((self.scroll_zoom_state.x.view_start / DEFAULT_TICK_WIDTH) as i32, (self.scroll_zoom_state.x.view_end / DEFAULT_TICK_WIDTH) as i32);
+            let grid = self.settings.tick_grid.get_grid_lines(self.scroll_zoom_state.x.view_start as i32, self.scroll_zoom_state.x.view_end as i32);
 
             grid.iter()
                 .map(|line| {
-                    let x = line.tick as f32 * DEFAULT_TICK_WIDTH * self.scroll_zoom_state.x.scale(bounds.width);
+                    let x = line.tick as f32 * self.scroll_zoom_state.x.scale(bounds.width);
 
                     let colour = match line.line_type {
                         LineType::Bar(_) => Color::from_rgb(0.0, 0.0, 0.0),
@@ -276,13 +273,13 @@ impl<'a, Message> PianoRoll<'a, Message> {
     fn draw_pitch_grid(&self, bounds: Rectangle) -> Vec<Primitive> {
         let lines = {
             let grid = self.settings.pitch_grid.get_grid_lines(
-                Pitch::from_octave_f32(self.scroll_zoom_state.y.view_start / DEFAULT_OCTAVE_HEIGHT),
-                Pitch::from_octave_f32(self.scroll_zoom_state.y.view_end / DEFAULT_OCTAVE_HEIGHT)
+                Pitch::from_octave_f32(self.scroll_zoom_state.y.view_start),
+                Pitch::from_octave_f32(self.scroll_zoom_state.y.view_end)
             );
 
             grid.iter()
                 .map(|line| {
-                    let y = line.pitch.to_f32() * DEFAULT_OCTAVE_HEIGHT;
+                    let y = line.pitch.to_f32();
 
                     let colour = match line.line_type {
                         pitch_grid::LineType::Tonic => Color::from([0.5, 1.0, 0.5, 0.3]),
@@ -339,8 +336,8 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
         let bounds = layout.bounds();
 
         let inner_cursor = self.scroll_zoom_state.screen_to_inner(cursor_position, &bounds);
-        let cursor_tick = (inner_cursor.x / DEFAULT_TICK_WIDTH) as i32;
-        let cursor_note = Pitch::new(-(12.0 * inner_cursor.y / DEFAULT_OCTAVE_HEIGHT).round() as i32, 12);
+        let cursor_tick = inner_cursor.x as i32;
+        let cursor_note = Pitch::new(-(12.0 * inner_cursor.y).round() as i32, 12);
 
         let cursor_lines = self.draw_cursor(bounds);
         let tick_grid_lines = self.draw_tick_grid(bounds);
@@ -423,8 +420,8 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
         let bounds = layout.bounds();
 
         let inner_cursor = self.scroll_zoom_state.screen_to_inner(cursor_position, &bounds);
-        let cursor_tick = (inner_cursor.x / DEFAULT_TICK_WIDTH) as i32;
-        let cursor_note = Pitch::new(-(12.0 * inner_cursor.y / DEFAULT_OCTAVE_HEIGHT).round() as i32, 12);
+        let cursor_tick = inner_cursor.x as i32;
+        let cursor_note = Pitch::new(-(12.0 * inner_cursor.y).round() as i32, 12);
 
         let notes = self.notes.lock().unwrap();
 

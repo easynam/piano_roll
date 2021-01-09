@@ -60,7 +60,7 @@ impl Application for App {
                 piano_roll: piano_roll::PianoRollState::new(),
                 scroll_zoom:ScrollZoomState {
                     x: ScrollScaleAxis::new(0.0,32.0*32.0, 0.0, 32.0*32.0*4.0),
-                    y: ScrollScaleAxis::new(-1.5*200.0, 3.0*200.0, -4.0*200.0, 8.0*200.0),
+                    y: ScrollScaleAxis::new(-1.5, 3.0, -4.0, 8.0),
                 },
                 scroll_bar: ScrollZoomBarState::new(),
                 scroll_bar_2: ScrollZoomBarState::new(),
