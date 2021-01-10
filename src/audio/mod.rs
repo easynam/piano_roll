@@ -67,14 +67,14 @@ impl Synth {
 
         let mut sample_pos = 0;
         let mut cursor_pos = 0;
-        let (mut emitter, mut samples_receiver) = AudioEmitter::new();
+        let mut emitter = AudioEmitter::new();
         let config = emitter.get_config();
         let (controller, source) = RedoxSynthGenerator::new(config.sample_rate.0 as f32, "gm.sf2")
             .expect("redoxsynth init to succeed");
         let mut player = Player::new(200, notes.clone(), Box::new(controller));
         let delay = Delay::new(10000, 0.0, 1.0, 0.75);
         let fxsource = FxSource::new(Box::new(source), vec![Box::new(delay)]);
-        emitter.start(Box::new(fxsource));
+        let mut samples_receiver = emitter.start(Box::new(fxsource));
 
         loop {
             while let Ok(Some(command)) = self.recv.try_next() {
