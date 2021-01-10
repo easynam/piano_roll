@@ -22,7 +22,6 @@ use crate::sequence::{Sequence, Pitch};
 use self::{
     audio_emitter::AudioEmitter, effect::Delay, player::Player, redoxsynth::RedoxSynthGenerator,
 };
-use cpal::Stream;
 
 #[derive(Debug, Clone)]
 pub enum Command {
@@ -79,7 +78,7 @@ impl Synth {
         loop {
             while let Ok(Some(command)) = self.recv.try_next() {
                 match command {
-                    Command::Play => player.play(sample_pos),
+                    Command::Play => player.play_at(sample_pos, Some((200, 1000)), 0),
                     Command::Stop => player.stop(),
                     Command::StartPreview(pitch) => player.play_preview(pitch),
                     Command::StopPreview => player.stop_preview(),

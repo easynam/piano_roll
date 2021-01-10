@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use crate::sequence::{Sequence, Pitch};
+use crate::sequence::{Pitch, Sequence};
 
 use super::controller::{Controller, Event, EventData};
 
@@ -8,6 +8,7 @@ pub struct Player {
     notes: Arc<Mutex<Sequence>>,
     sequence: usize,
     start_sample: usize,
+    looping: Option<(usize, usize)>,
     samples_per_tick: usize,
     controller: Box<dyn Controller>,
     cursor: usize,
@@ -16,11 +17,16 @@ pub struct Player {
 }
 
 impl Player {
-    pub fn new(samples_per_tick: usize, notes: Arc<Mutex<Sequence>>, controller: Box<dyn Controller>) -> Self {
+    pub fn new(
+        samples_per_tick: usize,
+        notes: Arc<Mutex<Sequence>>,
+        controller: Box<dyn Controller>,
+    ) -> Self {
         Self {
             notes,
             sequence: 0,
             start_sample: 0,
+            looping: None,
             samples_per_tick,
             controller,
             cursor: 0,
@@ -29,9 +35,10 @@ impl Player {
         }
     }
 
-    pub fn play(&mut self, start_sample: usize) {
+    pub fn play_at(&mut self, start_sample: usize, looping: Option<(usize, usize)>, cursor: usize) {
         self.start_sample = start_sample;
-        self.cursor = 0;
+        self.looping = looping.map(|x| (x.0 * self.samples_per_tick, x.1 * self.samples_per_tick));
+        self.cursor = cursor;
         self.playing = true;
     }
 
@@ -95,17 +102,35 @@ impl Player {
         self.preview = None;
     }
 
-    fn scan_events(
-        &mut self,
-        length: usize,
-    ) {
+    fn scan_events(&mut self, mut length: usize) {
         let cursor_end = self.cursor + length;
+
+        if let Some((loop_start_sample, loop_end_sample)) = self.looping {
+            if self.cursor < loop_end_sample && cursor_end >= loop_end_sample {
+                self.scan_event_range(self.cursor, loop_end_sample);
+                length -= loop_end_sample - self.cursor;
+                self.start_sample += self.cursor - loop_start_sample;
+                self.cursor = loop_start_sample;
+
+                // length may be zero at the exact end sample of a loop, in which case
+                // it is pointless to scan notes again
+                if length == 0 {
+                    return;
+                }
+            }
+        }
+
+        self.scan_event_range(self.cursor, self.cursor + length);
+        self.cursor += length;
+    }
+
+    fn scan_event_range(&mut self, range_start: usize, range_end: usize) {
         let notes = self.notes.lock().unwrap();
 
         for note in notes.iter() {
             let start_sample = note.tick as usize * self.samples_per_tick;
             let end_sample = start_sample + note.length as usize * self.samples_per_tick;
-            if start_sample >= self.cursor && start_sample < cursor_end {
+            if start_sample >= range_start && start_sample < range_end {
                 self.controller.send_event(Event {
                     sample: self.start_sample + start_sample,
                     sequence: self.sequence,
@@ -120,7 +145,5 @@ impl Player {
                 self.sequence += 1;
             }
         }
-
-        self.cursor += length;
     }
 }
