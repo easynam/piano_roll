@@ -28,7 +28,7 @@ pub struct PianoRoll<'a, Message> {
     on_synth_command: Box<dyn Fn(Command) -> Message + 'a>,
     scroll_zoom_state: &'a ScrollZoomState,
     settings: &'a PianoRollSettings,
-    playback_cursor: &'a f32,
+    playback_cursor: &'a i32,
 }
 
 pub struct PianoRollState {
@@ -107,7 +107,7 @@ impl<'a, Message> PianoRoll<'a, Message> {
         on_synth_command: FS,
         scroll_zoom_state: &'a ScrollZoomState,
         settings: &'a PianoRollSettings,
-        playback_cursor: &'a f32,
+        playback_cursor: &'a i32,
     ) -> Self
         where
             F: 'a + Fn(SequenceChange) -> Message,

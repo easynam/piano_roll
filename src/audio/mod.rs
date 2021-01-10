@@ -35,7 +35,7 @@ pub enum Command {
 #[derive(Debug, Clone)]
 pub enum Status {
     CommandChannel(Sender<Command>),
-    PlaybackCursorUpdated(Option<f64>),
+    PlaybackCursorUpdated(i32),
 }
 
 pub struct Synth {
@@ -64,7 +64,7 @@ impl Synth {
             }
         }
 
-        let mut cursor_pos = None;
+        let mut cursor_pos = 0;
         let mut emitter = AudioEmitter::new();
         let config = emitter.get_config();
         let (controller, source) = RedoxSynthGenerator::new(config.sample_rate.0 as f32, "gm.sf2")

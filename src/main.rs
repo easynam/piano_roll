@@ -36,7 +36,8 @@ struct App {
     play_button: button::State,
     stop_button: button::State,
     synth_channel: Option<Sender<Command>>,
-    playback_cursor: f32,
+    playback_cursor: i32,
+    playback_start_cursor: i32,
 }
 
 #[derive(Debug, Clone)]
@@ -69,7 +70,8 @@ impl Application for App {
                 play_button: button::State::new(),
                 stop_button: button::State::new(),
                 synth_channel: None,
-                playback_cursor: 0.0
+                playback_cursor: 0,
+                playback_start_cursor: 0,
             },
             iced::Command::none(),
         )
@@ -117,7 +119,7 @@ impl Application for App {
                     self.synth_channel = Some(channel);
                 },
                 Status::PlaybackCursorUpdated(pos) => {
-                    self.playback_cursor = pos.unwrap_or(0.0) as f32;
+                    self.playback_cursor = pos;
                 }
             }
         }
