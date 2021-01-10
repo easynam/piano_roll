@@ -1,34 +1,37 @@
-use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
+use std::sync::{Arc, atomic::{AtomicUsize, Ordering}, Mutex};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use iced::futures::channel::mpsc::{Receiver, Sender, channel};
 
 use super::source::Source;
+use std::borrow::BorrowMut;
 
 pub struct AudioEmitter {
     stream: Option<cpal::Stream>,
-    counter: Arc<AtomicUsize>,
+    sender: Arc<Mutex<Sender<usize>>>,
     config: cpal::StreamConfig,
 }
 
 impl AudioEmitter {
-    pub fn new() -> Self {
-        Self {
-            stream: None,
-            config: cpal::StreamConfig {
-                channels: 2,
-                sample_rate: cpal::SampleRate(48000),
-                buffer_size: cpal::BufferSize::Default,
+    pub fn new() -> (Self, Receiver<usize>) {
+        let (tx, rx) = channel(64);
+
+        (
+            Self {
+                stream: None,
+                config: cpal::StreamConfig {
+                    channels: 2,
+                    sample_rate: cpal::SampleRate(48000),
+                    buffer_size: cpal::BufferSize::Default,
+                },
+                sender: Arc::new(Mutex::new(tx)),
             },
-            counter: Arc::new(AtomicUsize::new(0)),
-        }
+            rx
+        )
     }
 
     pub fn get_config(&self) -> cpal::StreamConfig {
         return self.config.clone();
-    }
-
-    pub fn get_sample_pos(&self) -> usize {
-        self.counter.load(Ordering::Acquire)
     }
 
     pub fn start(&mut self, source: Box<dyn Source>) {
@@ -39,7 +42,7 @@ impl AudioEmitter {
             device,
             &self.config,
             source,
-            self.counter.clone(),
+            self.sender.clone(),
         ));
     }
 
@@ -47,7 +50,7 @@ impl AudioEmitter {
         device: cpal::Device,
         config: &cpal::StreamConfig,
         mut source: Box<dyn Source>,
-        counter_atomic: Arc<AtomicUsize>,
+        mut sender: Arc<Mutex<Sender<usize>>>,
     ) -> cpal::Stream {
         let err_fn = |err| eprintln!("an error occurred on stream: {}", err);
 
@@ -63,8 +66,8 @@ impl AudioEmitter {
                     buffer.resize(data.len(), Default::default());
                     source.output_audio(counter, buffer.as_mut_slice());
                     data.iter_mut().zip(buffer.iter()).for_each(|(dst, src)| *dst = *src as f32);
+                    sender.lock().unwrap().try_send(data.len() / ch);
                     counter += data.len() / ch;
-                    counter_atomic.store(counter, Ordering::Release);
                 },
                 err_fn,
             )
