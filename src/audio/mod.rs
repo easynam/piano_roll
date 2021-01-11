@@ -94,6 +94,7 @@ impl Synth {
                     },
                     Command::Seek(seek_pos) => {
                         player.seek(sample_pos, seek_pos);
+                        start_cursor = seek_pos;
                     },
                     Command::StartPreview(pitch) => player.play_preview(pitch),
                     Command::StopPreview => player.stop_preview(),
