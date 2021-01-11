@@ -3,6 +3,7 @@ use std::sync::{Arc, Mutex};
 use crate::sequence::{Pitch, Sequence};
 
 use super::controller::{Controller, Event, EventData};
+use std::cmp::max;
 
 pub struct Player {
     notes: Arc<Mutex<Sequence>>,
@@ -38,7 +39,7 @@ impl Player {
     pub fn play_at(&mut self, start_sample: usize, looping: Option<(usize, usize)>, cursor: usize) {
         self.start_sample = start_sample;
         self.looping = looping.map(|x| (x.0 * self.samples_per_tick, x.1 * self.samples_per_tick));
-        self.cursor = cursor;
+        self.cursor = cursor * self.samples_per_tick;
         self.playing = true;
     }
 
@@ -60,14 +61,12 @@ impl Player {
         self.playing = false;
     }
 
-    pub fn process(&mut self, sample: usize) {
+    pub fn process(&mut self, samples: usize) {
         if !self.playing {
             return;
         }
-        if self.start_sample + self.cursor > sample {
-            return;
-        }
-        self.scan_events(sample - self.start_sample - self.cursor);
+
+        self.scan_events(samples);
     }
 
     pub fn play_preview(&mut self, pitch: Pitch) {

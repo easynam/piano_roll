@@ -78,7 +78,10 @@ impl Synth {
         loop {
             while let Ok(Some(command)) = self.recv.try_next() {
                 match command {
-                    Command::Play => player.play_at(sample_pos, Some((200, 1000)), 0),
+                    Command::Play => {
+                        player.play_at(sample_pos, Some((256, 512)), 0);
+                        player.process(4800);
+                    },
                     Command::Stop => player.stop(),
                     Command::StartPreview(pitch) => player.play_preview(pitch),
                     Command::StopPreview => player.stop_preview(),
@@ -87,10 +90,9 @@ impl Synth {
             }
 
             while let Ok(Some(samples)) = samples_receiver.try_next() {
+                player.process(samples);
                 sample_pos += samples;
             }
-
-            player.process(sample_pos + 4800);
 
             let new_cursor_pos = player.get_position_at(sample_pos);
             if cursor_pos != new_cursor_pos {

@@ -5,6 +5,7 @@ use iced::futures::channel::mpsc::{Receiver, Sender, channel};
 
 use super::source::Source;
 use std::borrow::BorrowMut;
+use cpal::Device;
 
 pub struct AudioEmitter {
     stream: Option<cpal::Stream>,
