@@ -9,6 +9,7 @@ pub struct Player {
     notes: Arc<Mutex<Sequence>>,
     sequence: usize,
     start_sample: usize,
+    start_cursor: usize,
     looping: Option<(usize, usize)>,
     samples_per_tick: usize,
     controller: Box<dyn Controller>,
@@ -27,6 +28,7 @@ impl Player {
             notes,
             sequence: 0,
             start_sample: 0,
+            start_cursor: 0,
             looping: None,
             samples_per_tick,
             controller,
@@ -41,20 +43,15 @@ impl Player {
         self.looping = looping.map(|x| (x.0 * self.samples_per_tick, x.1 * self.samples_per_tick));
         self.cursor = cursor * self.samples_per_tick;
         self.playing = true;
+        self.start_cursor = self.cursor;
     }
 
-    pub fn get_position_at(&self, sample: usize) -> i32 {
+    pub fn get_position(&self, offset: i32) -> i32 {
         if !self.playing {
             return 0;
         }
 
-        if sample < self.start_sample {
-            return 0;
-        }
-
-        let sample_delta = sample - self.start_sample;
-
-        return (sample_delta / self.samples_per_tick) as i32;
+        return (self.cursor as i32 + offset) / self.samples_per_tick as i32;
     }
 
     pub fn stop(&mut self) {
@@ -131,13 +128,13 @@ impl Player {
             let end_sample = start_sample + note.length as usize * self.samples_per_tick;
             if start_sample >= range_start && start_sample < range_end {
                 self.controller.send_event(Event {
-                    sample: self.start_sample + start_sample,
+                    sample: self.start_sample + start_sample - self.start_cursor,
                     sequence: self.sequence,
                     data: EventData::NoteOn(0, note.pitch.clone()),
                 });
                 self.sequence += 1;
                 self.controller.send_event(Event {
-                    sample: self.start_sample + end_sample,
+                    sample: self.start_sample + end_sample - self.start_cursor,
                     sequence: self.sequence,
                     data: EventData::NoteOff(0, note.pitch.clone()),
                 });

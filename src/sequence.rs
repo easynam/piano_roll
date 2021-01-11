@@ -101,7 +101,11 @@ pub fn update_sequence(seq: &mut Sequence, message: SequenceChange) {
             seq.push(note);
         },
         SequenceChange::Remove(idx) => {
-            seq.remove(idx);
+            if seq.len() > idx {
+                seq.remove(idx);
+            } else {
+                println!("this will be fixed when we change the sequence format ok");
+            }
         },
         SequenceChange::Update(idx, note) => {
             seq[idx] = note;
