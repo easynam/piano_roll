@@ -2,7 +2,7 @@ use iced_native::{Rectangle, Point};
 
 const SELECT_MIN_WIDTH: f32 = 12.0;
 const RESIZE_INNER: f32 = 8.0;
-const RESIZE_OUTER: f32 = 8.0;
+const RESIZE_OUTER: f32 = 4.0;
 
 pub trait RectangleHelpers {
     fn handle_right(&self) -> Rectangle;
