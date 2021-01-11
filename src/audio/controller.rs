@@ -9,6 +9,7 @@ pub struct Event {
 pub enum EventData {
     NoteOn(u32, Pitch),
     NoteOff(u32, Pitch),
+    ClearEvents,
 }
 
 pub trait Controller {

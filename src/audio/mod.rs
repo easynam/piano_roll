@@ -27,7 +27,9 @@ use self::{
 pub enum Command {
     SetNotes(Arc<Mutex<Sequence>>),
     Play,
+    Pause,
     Stop,
+    Seek(i32),
     StartPreview(Pitch),
     StopPreview,
 }
@@ -70,34 +72,44 @@ impl Synth {
         let config = emitter.get_config();
         let (controller, source) = RedoxSynthGenerator::new(config.sample_rate.0 as f32, "gm.sf2")
             .expect("redoxsynth init to succeed");
-        let mut player = Player::new(200, notes.clone(), Box::new(controller));
+        let mut player = Player::new(200, notes.clone(), Box::new(controller), 4800);
         let delay = Delay::new(10000, 0.0, 1.0, 0.75);
         let fxsource = FxSource::new(Box::new(source), vec![Box::new(delay)]);
         let mut samples_receiver = emitter.start(Box::new(fxsource));
+
+        let mut start_cursor = 0;
 
         loop {
             while let Ok(Some(command)) = self.recv.try_next() {
                 match command {
                     Command::Play => {
-                        player.play_at(sample_pos, Some((256, 512)), 400);
-                        player.process(4800);
+                        player.play(sample_pos);
                     },
-                    Command::Stop => player.stop(),
+                    Command::Stop => {
+                        player.pause();
+                        player.seek(sample_pos, start_cursor);
+                    },
+                    Command::Pause => {
+                        player.pause();
+                    },
+                    Command::Seek(seek_pos) => {
+                        player.seek(sample_pos, seek_pos);
+                    },
                     Command::StartPreview(pitch) => player.play_preview(pitch),
                     Command::StopPreview => player.stop_preview(),
                     Command::SetNotes(_) => panic!("SetNotes after init")
                 }
             }
 
-            while let Ok(Some(samples)) = samples_receiver.try_next() {
-                player.process(samples);
-                sample_pos += samples;
-            }
-
-            let new_cursor_pos = player.get_position(-4800);
+            let new_cursor_pos = player.get_position();
             if cursor_pos != new_cursor_pos {
                 cursor_pos = new_cursor_pos;
                 self.send.try_send(Status::PlaybackCursorUpdated(cursor_pos));
+            }
+
+            while let Ok(Some(samples)) = samples_receiver.try_next() {
+                player.process(samples);
+                sample_pos += samples;
             }
 
             thread::sleep(Duration::from_millis(10));

@@ -15,6 +15,7 @@ pub struct RedoxSynthSource {
     synth: redoxsynth::Synth,
     events: Vec<Event>,
     event_queue: Arc<SegQueue<Event>>,
+    playing_notes: Vec<(u32, u32)>,
 }
 
 pub struct RedoxSynthGenerator {}
@@ -61,7 +62,12 @@ impl RedoxSynthSource {
             synth,
             events: Vec::new(),
             event_queue,
+            playing_notes: Vec::new(),
         }
+    }
+
+    fn clear_events(&mut self) {
+        self.events.clear();
     }
 
     fn insert_event(&mut self, event: Event) {
@@ -83,7 +89,13 @@ impl Source for RedoxSynthSource {
 
         loop {
             match self.event_queue.pop() {
-                Some(event) => self.insert_event(event),
+                Some(event) => {
+                    if let EventData::ClearEvents = event.data {
+                        self.clear_events();
+                    }
+
+                    self.insert_event(event)
+                },
                 None => break,
             }
         }
@@ -106,9 +118,23 @@ impl Source for RedoxSynthSource {
                     let (key, bend) = n.midi_pitch(2.0);
                     self.synth.note_on(*chan, key, 127);
                     self.synth.pitch_bend(*chan, bend);
+
+                    if !self.playing_notes.contains(&(*chan, key)) {
+                        self.playing_notes.push((*chan, key));
+                    }
                 }
                 EventData::NoteOff(chan, n) => {
-                    self.synth.note_off(*chan, n.midi_pitch(2.0).0);
+                    let (key, _bend) = n.midi_pitch(2.0);
+                    self.synth.note_off(*chan, key);
+
+                    if let Ok(i) = self.playing_notes.binary_search(&(*chan, key)) {
+                        self.playing_notes.remove(i);
+                    }
+                }
+                EventData::ClearEvents => {
+                    for note in &self.playing_notes {
+                        self.synth.note_off(note.0, note.1);
+                    }
                 }
             }
         }

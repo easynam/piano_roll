@@ -128,7 +128,7 @@ impl Application for App {
 
     fn view(&mut self) -> Element<Self::Message> {
         Column::new()
-            .push(Container::new(Timeline::new(&self.scroll_zoom.x, &self.settings)).max_width(800))
+            .push(Container::new(Timeline::new(&self.scroll_zoom.x, &self.settings, Message::SynthCommand)).max_width(800))
             .push(Row::new()
                 .push(Container::new(
                     PianoRoll::new(&mut self.piano_roll, self.notes.as_ref(), Message::Sequence, Message::PianoRoll, Message::SynthCommand, &self.scroll_zoom, &self.settings, &self.playback_cursor))

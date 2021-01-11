@@ -16,6 +16,8 @@ pub struct Player {
     cursor: usize,
     playing: bool,
     preview: Option<Pitch>,
+    buffer_size: usize,
+    playing_frame: usize,
 }
 
 impl Player {
@@ -23,6 +25,7 @@ impl Player {
         samples_per_tick: usize,
         notes: Arc<Mutex<Sequence>>,
         controller: Box<dyn Controller>,
+        buffer_size: usize,
     ) -> Self {
         Self {
             notes,
@@ -35,27 +38,46 @@ impl Player {
             cursor: 0,
             playing: false,
             preview: None,
+            buffer_size,
+            playing_frame: 0,
         }
     }
 
-    pub fn play_at(&mut self, start_sample: usize, looping: Option<(usize, usize)>, cursor: usize) {
-        self.start_sample = start_sample;
-        self.looping = looping.map(|x| (x.0 * self.samples_per_tick, x.1 * self.samples_per_tick));
-        self.cursor = cursor * self.samples_per_tick;
-        self.playing = true;
-        self.start_cursor = self.cursor;
+    pub fn set_loop(&mut self, looping: Option<(i32, i32)>) {
+        self.looping = looping.map(|x| (x.0 as usize * self.samples_per_tick, x.1 as usize * self.samples_per_tick));
     }
 
-    pub fn get_position(&self, offset: i32) -> i32 {
+    pub fn seek(&mut self, start_sample: usize, cursor: i32) {
+        self.playing_frame = cursor as usize * self.samples_per_tick;
+        if self.playing {
+            self.playing = false;
+            self.play(start_sample);
+        }
+    }
+
+    pub fn play(&mut self, start_sample: usize) {
         if !self.playing {
-            return 0;
+            self.start_sample = start_sample;
+            self.cursor = self.playing_frame;
+            self.playing = true;
+            self.start_cursor = self.cursor;
+            self.scan_events(self.buffer_size);
         }
-
-        return (self.cursor as i32 + offset) / self.samples_per_tick as i32;
     }
 
-    pub fn stop(&mut self) {
+    pub fn get_position(&self) -> i32 {
+        return self.playing_frame as i32 / self.samples_per_tick as i32;
+    }
+
+    pub fn pause(&mut self) {
         self.playing = false;
+
+        self.controller.send_event(Event {
+            sample: 0,
+            sequence: self.sequence,
+            data: EventData::ClearEvents,
+        });
+        self.sequence += 1;
     }
 
     pub fn process(&mut self, samples: usize) {
@@ -63,6 +85,7 @@ impl Player {
             return;
         }
 
+        self.advance_playing_frame(samples);
         self.scan_events(samples);
     }
 
@@ -96,6 +119,20 @@ impl Player {
         }
 
         self.preview = None;
+    }
+
+    fn advance_playing_frame(&mut self, length: usize) {
+        let playing_frame_end = self.playing_frame + length;
+
+        if let Some((loop_start_sample, loop_end_sample)) = self.looping {
+            if self.playing_frame < loop_end_sample && playing_frame_end >= loop_end_sample {
+                self.playing_frame -= loop_end_sample - loop_start_sample;
+
+                return;
+            }
+        }
+
+        self.playing_frame = playing_frame_end;
     }
 
     fn scan_events(&mut self, mut length: usize) {

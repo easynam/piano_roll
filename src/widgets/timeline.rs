@@ -1,5 +1,5 @@
 use iced::Element;
-use iced_native::{Background, Hasher, Layout, Length, Point, Rectangle, Vector, Widget, HorizontalAlignment, VerticalAlignment};
+use iced_native::{Background, Hasher, Layout, Length, Point, Rectangle, Vector, Widget, HorizontalAlignment, VerticalAlignment, Event, Clipboard, mouse};
 use iced_native::layout::{Limits, Node};
 use iced_native::mouse::Interaction;
 use iced_wgpu::{Color, Defaults, Primitive, Renderer};
@@ -7,19 +7,29 @@ use iced_wgpu::{Color, Defaults, Primitive, Renderer};
 use crate::scroll_zoom::ScrollScaleAxis;
 use crate::widgets::piano_roll::PianoRollSettings;
 use crate::widgets::tick_grid::LineType;
+use crate::audio::Command;
+use iced_native::event::Status;
 
-pub struct Timeline<'a> {
+pub struct Timeline<'a, Message> {
     scroll: &'a ScrollScaleAxis,
     settings: &'a PianoRollSettings,
+    on_synth_command: Box<dyn Fn(Command) -> Message + 'a>,
 }
 
-impl<'a> Timeline<'a> {
-    pub fn new(scroll: &'a ScrollScaleAxis, settings: &'a PianoRollSettings) -> Self {
-        Self { scroll, settings }
+impl<'a, Message> Timeline<'a, Message> {
+    pub fn new<FS>(
+        scroll: &'a ScrollScaleAxis,
+        settings: &'a PianoRollSettings,
+        on_synth_command: FS,
+    ) -> Self
+        where
+            FS: 'a + Fn(Command) -> Message,
+    {
+        Self { scroll, settings, on_synth_command: Box::new(on_synth_command) }
     }
 }
 
-impl<'a, Message> Widget<Message, Renderer> for Timeline<'a> {
+impl<'a, Message> Widget<Message, Renderer> for Timeline<'a, Message> {
     fn width(&self) -> Length {
         Length::Fill
     }
@@ -133,10 +143,31 @@ impl<'a, Message> Widget<Message, Renderer> for Timeline<'a> {
     fn hash_layout(&self, _state: &mut Hasher) {
 
     }
+
+    fn on_event(&mut self, event: Event, layout: Layout<'_>, cursor_position: Point, messages: &mut Vec<Message>, _renderer: &Renderer, _clipboard: Option<&dyn Clipboard>) -> Status {
+        match event {
+            Event::Mouse(event) => match event {
+                mouse::Event::ButtonPressed(mouse::Button::Left) => {
+                    let bounds = layout.bounds();
+                    if bounds.contains(cursor_position) {
+                        let cursor_tick = self.scroll.screen_to_inner(cursor_position.x, bounds.x, bounds.width) as i32;
+
+                        messages.push((self.on_synth_command)(Command::Seek(cursor_tick)));
+
+                        Status::Captured
+                    } else {
+                        Status::Ignored
+                    }
+                },
+                _ => Status::Ignored,
+            }
+            _ => Status::Ignored,
+        }
+    }
 }
 
 impl<'a, Message> Into<Element<'a, Message>>
-for Timeline<'a>
+for Timeline<'a, Message>
     where
         Message: 'a,
 {
