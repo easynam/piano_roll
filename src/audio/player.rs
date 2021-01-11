@@ -105,7 +105,7 @@ impl Player {
             if self.cursor < loop_end_sample && cursor_end >= loop_end_sample {
                 self.scan_event_range(self.cursor, loop_end_sample);
                 length -= loop_end_sample - self.cursor;
-                self.start_sample += self.cursor - loop_start_sample;
+                self.start_sample += loop_end_sample - loop_start_sample;
                 self.cursor = loop_start_sample;
 
                 // length may be zero at the exact end sample of a loop, in which case
