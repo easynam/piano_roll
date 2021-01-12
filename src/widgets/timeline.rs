@@ -70,7 +70,7 @@ impl<'a, Message> Widget<Message, Renderer> for Timeline<'a, Message> {
     }
 
     fn height(&self) -> Length {
-        Length::Units(20)
+        Length::Units(30)
     }
 
     fn layout(&self, _renderer: &Renderer, limits: &Limits) -> Node {

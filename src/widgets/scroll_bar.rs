@@ -139,15 +139,24 @@ impl<'a, Message> ScrollZoomBar<'a, Message> {
 
 impl<'a, Message> Widget<Message, Renderer> for ScrollZoomBar<'a, Message> {
     fn width(&self) -> Length {
-        Length::Fill
+        match self.orientation {
+            Orientation::Horizontal => Length::Fill,
+            Orientation::Vertical => Length::Units(20),
+        }
     }
 
     fn height(&self) -> Length {
-        Length::Units(1)
+        match self.orientation {
+            Orientation::Horizontal => Length::Units(20),
+            Orientation::Vertical => Length::Fill,
+        }
     }
 
     fn layout(&self, _renderer: &Renderer, limits: &Limits) -> Node {
-        Node::new(limits.max())
+        match self.orientation {
+            Orientation::Horizontal => Node::new(limits.height(Length::Units(20)).max()),
+            Orientation::Vertical => Node::new(limits.width(Length::Units(20)).max()),
+        }
     }
 
     fn draw(

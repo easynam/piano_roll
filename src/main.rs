@@ -2,7 +2,7 @@ use std::{fmt::Debug, sync::{Arc, Mutex}};
 use std::thread;
 
 use iced::{Application, Column, Element, Error, futures::{self, channel::mpsc::Sender}, Row, Settings, Subscription};
-use iced_native::{Button, Container, Text};
+use iced_native::{Button, Container, Text, Space, Length};
 use iced_native::widget::button;
 
 use audio::Status;
@@ -130,34 +130,52 @@ impl Application for App {
 
     fn view(&mut self) -> Element<Self::Message> {
         Column::new()
-            .push(Container::new(Timeline::new(&self.scroll_zoom.x, &self.settings, Message::SynthCommand, &mut self.timeline)).max_width(800))
             .push(Row::new()
-                .push(Container::new(
-                    PianoRoll::new(&mut self.piano_roll, self.notes.as_ref(), Message::Sequence, Message::PianoRoll, Message::SynthCommand, &self.scroll_zoom, &self.settings, &self.playback_cursor))
-                    .max_width(800)
-                    .max_height(600))
-                .push(Container::new(
-                    ScrollZoomBar::new(
-                        &mut self.scroll_bar_2, &self.scroll_zoom.y, Message::Scroll2, Orientation::Vertical, false
-                    ))
-                    .max_height(600)
-                    .max_width(20)
-                )
-            )
-            .push(Container::new(
-                ScrollZoomBar::new(
-                    &mut self.scroll_bar, &self.scroll_zoom.x, Message::Scroll, Orientation::Horizontal, true
+                .push(Timeline::new(
+                    &self.scroll_zoom.x,
+                    &self.settings,
+                    Message::SynthCommand,
+                    &mut self.timeline
                 ))
-                .max_width(800)
-                .max_height(20)
+                .push(Space::new(Length::Units(20), Length::Shrink))
+            )
+            .push(Row::new()
+                .push(PianoRoll::new(
+                    &mut self.piano_roll,
+                    self.notes.as_ref(),
+                    Message::Sequence,
+                    Message::PianoRoll,
+                    Message::SynthCommand,
+                    &self.scroll_zoom,
+                    &self.settings,
+                    &self.playback_cursor
+                ))
+                .push(ScrollZoomBar::new(
+                    &mut self.scroll_bar_2,
+                    &self.scroll_zoom.y,
+                    Message::Scroll2,
+                    Orientation::Vertical,
+                    false
+                ))
+                .height(Length::Fill)
+            )
+            .push(Row::new()
+                .push(ScrollZoomBar::new(
+                    &mut self.scroll_bar,
+                    &self.scroll_zoom.x,
+                    Message::Scroll,
+                    Orientation::Horizontal,
+                    true
+                ))
+                .push(Space::new(Length::Units(20), Length::Shrink))
             )
             .push(Row::new()
                 .push(Button::new(&mut self.play_button, Text::new("Play"))
                     .on_press(Message::SynthCommand(Command::Play)))
                 .push(Button::new(&mut self.stop_button, Text::new("Stop"))
                     .on_press(Message::SynthCommand(Command::Stop)))
+                .height(Length::Units(50))
             )
-            .padding(40)
             .into()
     }
 
