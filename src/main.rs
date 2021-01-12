@@ -14,7 +14,7 @@ use crate::scroll_zoom::{ScrollScaleAxis, ScrollScaleAxisChange, ScrollZoomState
 use crate::sequence::{Sequence, SequenceChange, update_sequence};
 use crate::widgets::piano_roll::Action;
 use crate::widgets::scroll_bar::{Orientation, ScrollZoomBar, ScrollZoomBarState};
-use crate::widgets::timeline::Timeline;
+use crate::widgets::timeline::{Timeline, TimelineState};
 
 mod audio;
 mod sequence;
@@ -31,6 +31,7 @@ struct App {
     scroll_zoom: ScrollZoomState,
     scroll_bar: ScrollZoomBarState,
     scroll_bar_2: ScrollZoomBarState,
+    timeline: TimelineState,
     notes: Arc<Mutex<Sequence>>,
     settings: PianoRollSettings,
     play_button: button::State,
@@ -65,6 +66,7 @@ impl Application for App {
                 },
                 scroll_bar: ScrollZoomBarState::new(),
                 scroll_bar_2: ScrollZoomBarState::new(),
+                timeline: TimelineState::new(),
                 notes: Arc::new(Mutex::new(Vec::new())),
                 settings: PianoRollSettings::default(),
                 play_button: button::State::new(),
@@ -128,7 +130,7 @@ impl Application for App {
 
     fn view(&mut self) -> Element<Self::Message> {
         Column::new()
-            .push(Container::new(Timeline::new(&self.scroll_zoom.x, &self.settings, Message::SynthCommand)).max_width(800))
+            .push(Container::new(Timeline::new(&self.scroll_zoom.x, &self.settings, Message::SynthCommand, &mut self.timeline)).max_width(800))
             .push(Row::new()
                 .push(Container::new(
                     PianoRoll::new(&mut self.piano_roll, self.notes.as_ref(), Message::Sequence, Message::PianoRoll, Message::SynthCommand, &self.scroll_zoom, &self.settings, &self.playback_cursor))

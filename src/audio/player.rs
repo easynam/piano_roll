@@ -48,10 +48,13 @@ impl Player {
     }
 
     pub fn seek(&mut self, start_sample: usize, cursor: i32) {
-        self.playing_frame = cursor as usize * self.samples_per_tick;
-        if self.playing {
-            self.playing = false;
-            self.play(start_sample);
+        let new_playing_frame = cursor as usize * self.samples_per_tick;
+        if self.playing_frame != new_playing_frame {
+            self.playing_frame = new_playing_frame;
+            if self.playing {
+                self.playing = false;
+                self.play(start_sample);
+            }
         }
     }
 

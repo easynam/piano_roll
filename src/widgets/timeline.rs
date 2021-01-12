@@ -1,5 +1,5 @@
 use iced::Element;
-use iced_native::{Background, Hasher, Layout, Length, Point, Rectangle, Vector, Widget, HorizontalAlignment, VerticalAlignment, Event, Clipboard, mouse};
+use iced_native::{Background, Hasher, Layout, Length, Point, Rectangle, Vector, Widget, HorizontalAlignment, VerticalAlignment, Event, Clipboard, mouse, keyboard};
 use iced_native::layout::{Limits, Node};
 use iced_native::mouse::Interaction;
 use iced_wgpu::{Color, Defaults, Primitive, Renderer};
@@ -9,11 +9,34 @@ use crate::widgets::piano_roll::PianoRollSettings;
 use crate::widgets::tick_grid::LineType;
 use crate::audio::Command;
 use iced_native::event::Status;
+use iced_native::keyboard::Modifiers;
+use std::cmp::max;
 
 pub struct Timeline<'a, Message> {
     scroll: &'a ScrollScaleAxis,
     settings: &'a PianoRollSettings,
     on_synth_command: Box<dyn Fn(Command) -> Message + 'a>,
+    state: &'a mut TimelineState,
+}
+
+pub struct TimelineState {
+    action: Action,
+    modifiers: Modifiers,
+}
+
+impl TimelineState {
+    pub fn new() -> Self {
+        Self {
+            action: Action::None,
+            modifiers: Default::default()
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Action {
+    None,
+    Seeking,
 }
 
 impl<'a, Message> Timeline<'a, Message> {
@@ -21,11 +44,23 @@ impl<'a, Message> Timeline<'a, Message> {
         scroll: &'a ScrollScaleAxis,
         settings: &'a PianoRollSettings,
         on_synth_command: FS,
+        state: &'a mut TimelineState,
     ) -> Self
         where
             FS: 'a + Fn(Command) -> Message,
     {
-        Self { scroll, settings, on_synth_command: Box::new(on_synth_command) }
+        Self { scroll, settings, on_synth_command: Box::new(on_synth_command), state }
+    }
+
+    fn seek(&mut self, cursor_position: Point, messages: &mut Vec<Message>, bounds: Rectangle) {
+        let mut cursor_tick = self.scroll.screen_to_inner(cursor_position.x, bounds.x, bounds.width) as i32;
+
+        if !self.state.modifiers.alt {
+            cursor_tick = self.settings.tick_grid.quantize_tick(cursor_tick);
+        }
+        cursor_tick = max(0, cursor_tick);
+
+        messages.push((self.on_synth_command)(Command::Seek(cursor_tick)));
     }
 }
 
@@ -147,24 +182,45 @@ impl<'a, Message> Widget<Message, Renderer> for Timeline<'a, Message> {
     fn on_event(&mut self, event: Event, layout: Layout<'_>, cursor_position: Point, messages: &mut Vec<Message>, _renderer: &Renderer, _clipboard: Option<&dyn Clipboard>) -> Status {
         match event {
             Event::Mouse(event) => match event {
+                mouse::Event::CursorMoved { .. } => {
+                    match self.state.action {
+                        Action::None => {
+                            Status::Ignored
+                        }
+                        Action::Seeking => {
+                            let bounds = layout.bounds();
+                            self.seek(cursor_position, messages, bounds);
+
+                            Status::Captured
+                        }
+                    }
+                }
                 mouse::Event::ButtonPressed(mouse::Button::Left) => {
                     let bounds = layout.bounds();
                     if bounds.contains(cursor_position) {
-                        let cursor_tick = self.scroll.screen_to_inner(cursor_position.x, bounds.x, bounds.width) as i32;
-
-                        messages.push((self.on_synth_command)(Command::Seek(cursor_tick)));
+                        self.state.action = Action::Seeking;
+                        self.seek(cursor_position, messages, bounds);
 
                         Status::Captured
                     } else {
                         Status::Ignored
                     }
                 },
+                mouse::Event::ButtonReleased(mouse::Button::Left) => {
+                    self.state.action = Action::None;
+                    Status::Captured
+                },
                 _ => Status::Ignored,
             }
+            Event::Keyboard(keyboard::Event::ModifiersChanged(modifiers)) => {
+                self.state.modifiers = modifiers;
+                Status::Ignored
+            },
             _ => Status::Ignored,
         }
     }
 }
+
 
 impl<'a, Message> Into<Element<'a, Message>>
 for Timeline<'a, Message>
