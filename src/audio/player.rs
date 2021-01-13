@@ -3,7 +3,6 @@ use std::sync::{Arc, Mutex};
 use crate::sequence::{Pitch, Sequence};
 
 use super::controller::{Controller, Event, EventData};
-use std::cmp::max;
 
 pub struct Player {
     notes: Arc<Mutex<Sequence>>,

@@ -12,7 +12,7 @@ use iced_wgpu::{Defaults, Primitive, Renderer};
 use crate::audio::Command;
 use crate::helpers::RectangleHelpers;
 use crate::scroll_zoom::ScrollZoomState;
-use crate::sequence::{Note, Pitch, Sequence, SequenceChange, NoteId};
+use crate::sequence::{Note, NoteId, Pitch, Sequence, SequenceChange};
 use crate::sequence::SequenceChange::{Add, Remove, Update};
 use crate::widgets::piano_roll::Action::{Dragging, Resizing, Selecting};
 use crate::widgets::piano_roll::HoverState::{CanDrag, CanResize, OutOfBounds};

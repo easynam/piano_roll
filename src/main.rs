@@ -2,7 +2,7 @@ use std::{fmt::Debug, sync::{Arc, Mutex}};
 use std::thread;
 
 use iced::{Application, Column, Element, Error, futures::{self, channel::mpsc::Sender}, Row, Settings, Subscription};
-use iced_native::{Button, Container, Text, Space, Length};
+use iced_native::{Button, Text, Space, Length};
 use iced_native::widget::button;
 
 use audio::Status;
@@ -12,7 +12,7 @@ use widgets::piano_roll;
 use crate::audio::{Command, Synth};
 use crate::scroll_zoom::{ScrollScaleAxis, ScrollScaleAxisChange, ScrollZoomState};
 use crate::sequence::{Sequence, SequenceChange};
-use crate::widgets::piano_roll::{Action, PianoRollMessage};
+use crate::widgets::piano_roll::{PianoRollMessage};
 use crate::widgets::scroll_bar::{Orientation, ScrollZoomBar, ScrollZoomBarState};
 use crate::widgets::timeline::{Timeline, TimelineState};
 

@@ -1,11 +1,6 @@
-use std::sync::{Arc, atomic::{AtomicUsize, Ordering}, Mutex};
-
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use iced::futures::channel::mpsc::{Receiver, Sender, channel};
-
+use iced::futures::channel::mpsc::{Receiver, channel};
 use super::source::Source;
-use std::borrow::BorrowMut;
-use cpal::Device;
 
 pub struct AudioEmitter {
     stream: Option<cpal::Stream>,
