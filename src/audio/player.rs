@@ -163,7 +163,7 @@ impl Player {
     fn scan_event_range(&mut self, range_start: usize, range_end: usize) {
         let notes = self.notes.lock().unwrap();
 
-        for note in notes.iter() {
+        for (_, note) in notes.iter() {
             let start_sample = note.tick as usize * self.samples_per_tick;
             let end_sample = start_sample + note.length as usize * self.samples_per_tick;
             if start_sample >= range_start && start_sample < range_end {

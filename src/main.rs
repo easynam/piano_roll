@@ -11,7 +11,7 @@ use widgets::piano_roll;
 
 use crate::audio::{Command, Synth};
 use crate::scroll_zoom::{ScrollScaleAxis, ScrollScaleAxisChange, ScrollZoomState};
-use crate::sequence::{Sequence, SequenceChange, update_sequence};
+use crate::sequence::{Sequence, SequenceChange};
 use crate::widgets::piano_roll::{Action, PianoRollMessage};
 use crate::widgets::scroll_bar::{Orientation, ScrollZoomBar, ScrollZoomBarState};
 use crate::widgets::timeline::{Timeline, TimelineState};
@@ -67,7 +67,7 @@ impl Application for App {
                 scroll_bar: ScrollZoomBarState::new(),
                 scroll_bar_2: ScrollZoomBarState::new(),
                 timeline: TimelineState::new(),
-                notes: Arc::new(Mutex::new(Vec::new())),
+                notes: Arc::new(Mutex::new(Sequence::new())),
                 settings: PianoRollSettings::default(),
                 play_button: button::State::new(),
                 stop_button: button::State::new(),
@@ -87,7 +87,7 @@ impl Application for App {
         match message {
             Message::Sequence(change) => {
                 let mut notes = self.notes.lock().unwrap();
-                update_sequence(&mut notes, change)
+                notes.update_sequence(change);
             },
             Message::Scroll(scroll) => match scroll {
                 ScrollScaleAxisChange::Left(new_pos) => {

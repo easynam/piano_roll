@@ -12,7 +12,7 @@ use iced_wgpu::{Defaults, Primitive, Renderer};
 use crate::audio::Command;
 use crate::helpers::RectangleHelpers;
 use crate::scroll_zoom::ScrollZoomState;
-use crate::sequence::{Note, Pitch, Sequence, SequenceChange};
+use crate::sequence::{Note, Pitch, Sequence, SequenceChange, NoteId};
 use crate::sequence::SequenceChange::{Add, Remove, Update};
 use crate::widgets::piano_roll::Action::{Dragging, Resizing, Selecting};
 use crate::widgets::piano_roll::HoverState::{CanDrag, CanResize, OutOfBounds};
@@ -35,7 +35,7 @@ pub struct PianoRollState {
     action: Action,
     hover: HoverState,
     modifiers: Modifiers,
-    selection: Vec<usize>,
+    selection: Vec<NoteId>,
 }
 
 pub struct PianoRollSettings {
@@ -68,16 +68,16 @@ impl Default for PianoRollSettings {
 enum HoverState {
     None,
     OutOfBounds,
-    CanDrag(usize),
-    CanResize(usize),
+    CanDrag(NoteId),
+    CanResize(NoteId),
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Action {
     None,
     Deleting,
-    Dragging(usize, i32),
-    Resizing(usize, i32),
+    Dragging(NoteId, i32),
+    Resizing(NoteId, i32),
     Selecting(i32, Pitch),
 }
 
@@ -100,13 +100,13 @@ impl PianoRollState {
         match event {
             PianoRollMessage::Action(action) => self.action = action,
             PianoRollMessage::DragLastCreatedNote(cursor_tick) => {
-                if let Some(note) = notes.last() {
-                    self.action = Dragging(notes.len() - 1, cursor_tick - note.tick);
+                if let Some((id, note)) = notes.last_added() {
+                    self.action = Dragging(id, cursor_tick - note.tick);
                 }
             }
             PianoRollMessage::ResizeLastCreatedNote(cursor_tick) => {
-                if let Some(note) = notes.last() {
-                    self.action = Resizing(notes.len() - 1, cursor_tick - note.tick);
+                if let Some((id, note)) = notes.last_added() {
+                    self.action = Resizing(id, cursor_tick - note.tick);
                 }
             }
         }
@@ -123,7 +123,7 @@ pub enum PianoRollMessage {
 impl<'a, Message> PianoRoll<'a, Message> {
     pub fn new<F, FA, FS>(
         state: &'a mut PianoRollState,
-        notes: &'a Mutex<Vec<Note>>,
+        notes: &'a Mutex<Sequence>,
         on_change: F,
         on_self_change: FA,
         on_synth_command: FS,
@@ -179,15 +179,15 @@ impl<'a, Message> PianoRoll<'a, Message> {
         self.note_rect(note, bounds).handle_right()
     }
 
-    fn update_hover(&mut self, layout: Layout, cursor_position: Point, bounds: Rectangle, notes: &Vec<Note>) {
+    fn update_hover(&mut self, layout: Layout, cursor_position: Point, bounds: Rectangle, notes: &Sequence) {
         if layout.bounds().contains(cursor_position) {
             let resize = notes.iter()
-                .position(|note| {
+                .find(|(id, note)| {
                     self.note_resize_rect(note, bounds).contains(cursor_position)
                 });
 
             let hovered = notes.iter()
-                .position(|note| {
+                .find(|(id, note)| {
                     self.note_rect(note, bounds).contains(cursor_position)
                 });
 
@@ -197,21 +197,21 @@ impl<'a, Message> PianoRoll<'a, Message> {
                         None => {
                             self.state.hover = HoverState::None;
                         }
-                        Some(idx) => {
-                            self.state.hover = CanDrag(idx);
+                        Some((id, _)) => {
+                            self.state.hover = CanDrag(id);
                         }
                     }
                 }
-                Some(idx) => {
+                Some((id, _)) => {
                     match hovered {
                         None => {
-                            self.state.hover = CanResize(idx);
+                            self.state.hover = CanResize(id);
                         }
-                        Some(hover_idx) => {
-                            if idx == hover_idx {
-                                self.state.hover = CanResize(idx);
+                        Some((hover_id, _)) => {
+                            if id == hover_id {
+                                self.state.hover = CanResize(id);
                             } else {
-                                self.state.hover = CanDrag(hover_idx);
+                                self.state.hover = CanDrag(hover_id);
                             }
                         }
                     }
@@ -227,8 +227,8 @@ impl<'a, Message> PianoRoll<'a, Message> {
             HoverState::None => {
                 messages.push((self.on_self_change)(PianoRollMessage::Action(Action::Deleting)));
             },
-            CanDrag(idx) => {
-                messages.push((self.on_change)(Remove(idx)));
+            CanDrag(id) => {
+                messages.push((self.on_change)(Remove(id)));
                 messages.push((self.on_self_change)(PianoRollMessage::Action(Action::Deleting)));
             },
             CanResize(_) => {
@@ -380,7 +380,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                 primitives: pitch_grid_lines
             },
             Primitive::Group {
-                primitives: self.notes.lock().unwrap().iter().enumerate()
+                primitives: self.notes.lock().unwrap().iter()
                     .map(|(id, note)| {
                         let colour = match self.state.selection.contains(&id) {
                             true => Color::from_rgb(0.6, 0.9, 1.0),
@@ -461,7 +461,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                                     tick = self.settings.tick_grid.quantize_tick(tick - quantize_offset) + quantize_offset;
                                 }
 
-                                let mut selected_notes: Vec<(usize, &Note)> = self.state.selection.iter()
+                                let mut selected_notes: Vec<(NoteId, &Note)> = self.state.selection.iter()
                                     .filter_map(|id| notes.get(*id).map(|note| (*id, note)))
                                     .collect();
 
@@ -504,7 +504,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                                 }
                                 let length = tick - note.tick;
 
-                                let mut selected_notes: Vec<(usize, &Note)> = self.state.selection.iter()
+                                let mut selected_notes: Vec<(NoteId, &Note)> = self.state.selection.iter()
                                     .filter_map(|id| notes.get(*id).map(|note| (*id, note)))
                                     .collect();
 
@@ -540,7 +540,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                             let from_note = min(start_note, &cursor_note).clone();
                             let to_note = max(start_note, &cursor_note).clone();
 
-                            self.state.selection = notes.iter().enumerate()
+                            self.state.selection = notes.iter()
                                 .filter(|(_id, note)| note.tick <= to_tick && note.end_tick() >= from_tick && note.pitch <= to_note && note.pitch >= from_note)
                                 .map(|(id, _note)| id)
                                 .collect();
@@ -582,19 +582,21 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
 
                                 self.state.selection.clear();
                             },
-                            CanDrag(idx) => {
-                                let note = &notes[idx];
-                                messages.push((self.on_self_change)(PianoRollMessage::Action(Dragging(idx, cursor_tick - note.tick))));
-                                messages.push((self.on_synth_command)(Command::StartPreview(note.pitch.clone())));
-                                if !self.state.selection.contains(&idx) {
-                                    self.state.selection.clear();
+                            CanDrag(id) => {
+                                if let Some(note) = &notes.get(id) {
+                                    messages.push((self.on_self_change)(PianoRollMessage::Action(Dragging(id, cursor_tick - note.tick))));
+                                    messages.push((self.on_synth_command)(Command::StartPreview(note.pitch.clone())));
+                                    if !self.state.selection.contains(&id) {
+                                        self.state.selection.clear();
+                                    }
                                 }
                             },
-                            CanResize(idx) => {
-                                let note = &notes[idx];
-                                messages.push((self.on_self_change)(PianoRollMessage::Action(Resizing(idx, cursor_tick - note.tick - note.length))));
-                                if !self.state.selection.contains(&idx) {
-                                    self.state.selection.clear();
+                            CanResize(id) => {
+                                if let Some(note) = &notes.get(id) {
+                                    messages.push((self.on_self_change)(PianoRollMessage::Action(Resizing(id, cursor_tick - note.tick - note.length))));
+                                    if !self.state.selection.contains(&id) {
+                                        self.state.selection.clear();
+                                    }
                                 }
                             },
                         }

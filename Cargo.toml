@@ -17,6 +17,7 @@ num-bigint = "0.3.1"
 cpal = "0.13.1"
 crossbeam = "0.8.0"
 redoxsynth = { path = "crates/redoxsynth" }
+slotmap = "1.0.2"
 
 [workspace]
 members = ["crates/*"]

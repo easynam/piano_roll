@@ -3,8 +3,64 @@ use num_rational::{Rational32, Ratio};
 use num_traits::cast::ToPrimitive;
 use std::ops::{Neg, Add, Sub, Div};
 use num_bigint::BigInt;
+use slotmap::{new_key_type, SlotMap};
+use slotmap::basic::Iter;
 
-pub type Sequence = Vec<Note>;
+new_key_type! {
+    pub struct NoteId;
+}
+
+#[derive(Debug, Clone)]
+pub struct Sequence {
+    slotmap: SlotMap<NoteId, Note>,
+    last_added: Option<NoteId>,
+}
+
+#[derive(Debug, Clone)]
+pub enum SequenceChange {
+    Add(Note),
+    Remove(NoteId),
+    Update(NoteId, Note),
+}
+
+impl Sequence {
+    pub fn new() -> Self {
+        Self {
+            slotmap: SlotMap::with_key(),
+            last_added: None
+        }
+    }
+
+    pub fn update_sequence(&mut self, message: SequenceChange) {
+        match message {
+            SequenceChange::Add(note) => {
+                self.last_added = Some(self.slotmap.insert(note));
+            },
+            SequenceChange::Remove(id) => {
+                self.slotmap.remove(id);
+            },
+            SequenceChange::Update(id, new_note) => {
+                if let Some(note) = self.slotmap.get_mut(id) {
+                    *note = new_note;
+                }
+            },
+        }
+    }
+
+    pub fn last_added(&self) -> Option<(NoteId, &Note)> {
+        self.last_added.and_then(|key| {
+            self.slotmap.get(key).map(|note| (key, note))
+        })
+    }
+
+    pub fn iter(&self) -> Iter<NoteId, Note> {
+        self.slotmap.iter()
+    }
+
+    pub fn get(&self, id: NoteId) -> Option<&Note> {
+        self.slotmap.get(id)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Note {
@@ -85,30 +141,5 @@ impl Pitch {
 impl Note {
     pub fn end_tick(&self) -> i32 {
         self.tick + self.length
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum SequenceChange {
-    Add(Note),
-    Remove(usize),
-    Update(usize, Note),
-}
-
-pub fn update_sequence(seq: &mut Sequence, message: SequenceChange) {
-    match message {
-        SequenceChange::Add(note) => {
-            seq.push(note);
-        },
-        SequenceChange::Remove(idx) => {
-            if seq.len() > idx {
-                seq.remove(idx);
-            } else {
-                println!("this will be fixed when we change the sequence format ok");
-            }
-        },
-        SequenceChange::Update(idx, note) => {
-            seq[idx] = note;
-        },
     }
 }
