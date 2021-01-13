@@ -24,7 +24,7 @@ pub struct PianoRoll<'a, Message> {
     state: &'a mut PianoRollState,
     notes: &'a Mutex<Sequence>,
     on_change: Box<dyn Fn(SequenceChange) -> Message + 'a>,
-    on_action_change: Box<dyn Fn(Action) -> Message + 'a>,
+    on_self_change: Box<dyn Fn(PianoRollMessage) -> Message + 'a>,
     on_synth_command: Box<dyn Fn(Command) -> Message + 'a>,
     scroll_zoom_state: &'a ScrollZoomState,
     settings: &'a PianoRollSettings,
@@ -32,7 +32,7 @@ pub struct PianoRoll<'a, Message> {
 }
 
 pub struct PianoRollState {
-    pub(crate) action: Action,
+    action: Action,
     hover: HoverState,
     modifiers: Modifiers,
     selection: Vec<usize>,
@@ -96,6 +96,28 @@ impl PianoRollState {
     pub fn new() -> PianoRollState {
         PianoRollState::default()
     }
+    pub fn on_event(&mut self, event: PianoRollMessage, notes: &Sequence) {
+        match event {
+            PianoRollMessage::Action(action) => self.action = action,
+            PianoRollMessage::DragLastCreatedNote(cursor_tick) => {
+                if let Some(note) = notes.last() {
+                    self.action = Dragging(notes.len() - 1, cursor_tick - note.tick);
+                }
+            }
+            PianoRollMessage::ResizeLastCreatedNote(cursor_tick) => {
+                if let Some(note) = notes.last() {
+                    self.action = Resizing(notes.len() - 1, cursor_tick - note.tick);
+                }
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum PianoRollMessage {
+    Action(Action),
+    DragLastCreatedNote(i32),
+    ResizeLastCreatedNote(i32),
 }
 
 impl<'a, Message> PianoRoll<'a, Message> {
@@ -103,7 +125,7 @@ impl<'a, Message> PianoRoll<'a, Message> {
         state: &'a mut PianoRollState,
         notes: &'a Mutex<Vec<Note>>,
         on_change: F,
-        on_action_change: FA,
+        on_self_change: FA,
         on_synth_command: FS,
         scroll_zoom_state: &'a ScrollZoomState,
         settings: &'a PianoRollSettings,
@@ -111,7 +133,7 @@ impl<'a, Message> PianoRoll<'a, Message> {
     ) -> Self
         where
             F: 'a + Fn(SequenceChange) -> Message,
-            FA: 'a + Fn(Action) -> Message,
+            FA: 'a + Fn(PianoRollMessage) -> Message,
             FS: 'a + Fn(Command) -> Message,
     {
         Self {
@@ -119,7 +141,7 @@ impl<'a, Message> PianoRoll<'a, Message> {
             notes,
             scroll_zoom_state,
             on_change: Box::new(on_change),
-            on_action_change: Box::new(on_action_change),
+            on_self_change: Box::new(on_self_change),
             on_synth_command: Box::new(on_synth_command),
             settings,
             playback_cursor
@@ -203,14 +225,14 @@ impl<'a, Message> PianoRoll<'a, Message> {
     fn delete_hovered(&mut self, messages: &mut Vec<Message>) {
         match self.state.hover {
             HoverState::None => {
-                messages.push((self.on_action_change)(Action::Deleting));
+                messages.push((self.on_self_change)(PianoRollMessage::Action(Action::Deleting)));
             },
             CanDrag(idx) => {
                 messages.push((self.on_change)(Remove(idx)));
-                messages.push((self.on_action_change)(Action::Deleting));
+                messages.push((self.on_self_change)(PianoRollMessage::Action(Action::Deleting)));
             },
             CanResize(_) => {
-                messages.push((self.on_action_change)(Action::Deleting));
+                messages.push((self.on_self_change)(PianoRollMessage::Action(Action::Deleting)));
             },
             _ => {},
         }
@@ -528,7 +550,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                 }
                 mouse::Event::ButtonPressed(mouse::Button::Left) => {
                     if self.state.modifiers.control {
-                        messages.push((self.on_action_change)(Selecting(cursor_tick, cursor_note)));
+                        messages.push((self.on_self_change)(PianoRollMessage::Action(Selecting(cursor_tick, cursor_note))));
                     } else {
                         match self.state.hover {
                             HoverState::OutOfBounds => {}
@@ -545,16 +567,16 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                                             true => 0,
                                             false => self.settings.tick_grid.grid_size(tick),
                                         };
-                                        messages.push((self.on_action_change)(Resizing(notes.len(), cursor_tick - tick)));
                                         let note = Note { tick, pitch: cursor_note.clone(), length };
                                         messages.push((self.on_synth_command)(Command::StartPreview(note.pitch.clone())));
                                         messages.push( (self.on_change)(Add(note)));
+                                        messages.push((self.on_self_change)(PianoRollMessage::ResizeLastCreatedNote(cursor_tick)));
                                     }
                                     false => {
-                                        messages.push((self.on_action_change)(Dragging(notes.len(), cursor_tick - tick)));
                                         let note = Note { tick, pitch: cursor_note.clone(), length: 32 };
                                         messages.push((self.on_synth_command)(Command::StartPreview(note.pitch.clone())));
                                         messages.push( (self.on_change)(Add(note)));
+                                        messages.push((self.on_self_change)(PianoRollMessage::DragLastCreatedNote(cursor_tick)));
                                     }
                                 };
 
@@ -562,7 +584,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                             },
                             CanDrag(idx) => {
                                 let note = &notes[idx];
-                                messages.push((self.on_action_change)(Dragging(idx, cursor_tick - note.tick)));
+                                messages.push((self.on_self_change)(PianoRollMessage::Action(Dragging(idx, cursor_tick - note.tick))));
                                 messages.push((self.on_synth_command)(Command::StartPreview(note.pitch.clone())));
                                 if !self.state.selection.contains(&idx) {
                                     self.state.selection.clear();
@@ -570,7 +592,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                             },
                             CanResize(idx) => {
                                 let note = &notes[idx];
-                                messages.push((self.on_action_change)(Resizing(idx, cursor_tick - note.tick - note.length)));
+                                messages.push((self.on_self_change)(PianoRollMessage::Action(Resizing(idx, cursor_tick - note.tick - note.length))));
                                 if !self.state.selection.contains(&idx) {
                                     self.state.selection.clear();
                                 }
@@ -581,7 +603,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                     self.delete_hovered(messages);
                 }
                 mouse::Event::ButtonReleased( .. ) => {
-                    messages.push((self.on_action_change)(Action::None));
+                    messages.push((self.on_self_change)(PianoRollMessage::Action(Action::None)));
                     messages.push((self.on_synth_command)(Command::StopPreview));
                 }
                 _ => {}

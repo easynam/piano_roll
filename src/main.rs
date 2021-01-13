@@ -12,7 +12,7 @@ use widgets::piano_roll;
 use crate::audio::{Command, Synth};
 use crate::scroll_zoom::{ScrollScaleAxis, ScrollScaleAxisChange, ScrollZoomState};
 use crate::sequence::{Sequence, SequenceChange, update_sequence};
-use crate::widgets::piano_roll::Action;
+use crate::widgets::piano_roll::{Action, PianoRollMessage};
 use crate::widgets::scroll_bar::{Orientation, ScrollZoomBar, ScrollZoomBarState};
 use crate::widgets::timeline::{Timeline, TimelineState};
 
@@ -46,7 +46,7 @@ enum Message {
     Sequence(SequenceChange),
     Scroll(ScrollScaleAxisChange),
     Scroll2(ScrollScaleAxisChange),
-    PianoRoll(Action),
+    PianoRoll(PianoRollMessage),
     SynthCommand(Command),
     SynthStatus(Status),
 }
@@ -113,7 +113,7 @@ impl Application for App {
                 }
             },
             Message::PianoRoll(action) => {
-                self.piano_roll.action = action;
+                self.piano_roll.on_event(action, &*self.notes.lock().unwrap());
             }
             Message::SynthStatus(status) => match status {
                 Status::CommandChannel(mut channel) => {
