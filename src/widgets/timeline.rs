@@ -11,8 +11,7 @@ use crate::audio::{Command, PlaybackState};
 use iced_native::event::Status;
 use iced_native::keyboard::Modifiers;
 use std::cmp::max;
-use iced_wgpu::triangle::Mesh2D;
-use iced_graphics::widget::canvas::{Frame, Path, Fill, Stroke};
+use iced_graphics::widget::canvas::{Frame, Path, Stroke};
 
 pub struct Timeline<'a, Message> {
     scroll: &'a ScrollScaleAxis,
@@ -152,7 +151,7 @@ impl<'a, Message> Widget<Message, Renderer> for Timeline<'a, Message> {
             })
             .collect();
 
-        let playback_cursor_x = self.playback_state.playback_cursor as f32 * self.scroll.scale(bounds.width) - 15.0;
+        let playback_cursor_x = self.scroll.inner_to_screen(self.playback_state.playback_cursor as f32, bounds.x, bounds.width) - 15.0;
 
         let mut frame = Frame::new(Size::new(30.0,30.0));
         let path = Path::new(|path| {
