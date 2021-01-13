@@ -39,8 +39,8 @@ impl Sequence {
                 let new_id = self.slotmap.insert(note.clone());
                 self.last_added = Some(new_id);
                 let start_idx = self.note_starts
-                    .binary_search_by_key(&note.tick, |(tick, _id)| *tick)
-                    .unwrap_or_else(|idx| idx);
+                    .binary_search(&(note.tick, new_id))
+                    .expect_err("note_starts out of sync with slotmap");
 
                 self.note_starts.insert(start_idx, (note.tick, new_id));
             },
@@ -48,21 +48,23 @@ impl Sequence {
                 if let Some(old_note) = self.slotmap.remove(id) {
                     let _ = self.note_starts
                         .binary_search(&(old_note.tick, id))
-                        .map(|idx| self.note_starts.remove(idx));
+                        .map(|idx| self.note_starts.remove(idx))
+                        .expect("note_starts out of sync with slotmap");
                 }
             },
             SequenceChange::Update(id, new_note) => {
                 if let Some(note) = self.slotmap.get_mut(id) {
                     let idx = self.note_starts
-                        .binary_search(&(note.tick, id));
+                        .binary_search(&(note.tick, id))
+                        .expect("note_starts out of sync with slotmap");
 
                     *note = new_note.clone();
 
-                    idx.map(|idx| self.note_starts.remove(idx));
+                    self.note_starts.remove(idx);
 
                     let start_idx = self.note_starts
-                        .binary_search_by_key(&new_note.tick, |(tick, _id)| *tick)
-                        .unwrap_or_else(|idx| idx);
+                        .binary_search(&(new_note.tick, id))
+                        .expect_err("note_starts out of sync with slotmap");
 
                     self.note_starts.insert(start_idx, (new_note.tick, id));
                 }

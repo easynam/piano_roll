@@ -127,7 +127,7 @@ impl Source for RedoxSynthSource {
                     let (key, _bend) = n.midi_pitch(2.0);
                     self.synth.note_off(*chan, key);
 
-                    if let Ok(i) = self.playing_notes.binary_search(&(*chan, key)) {
+                    if let Some(i) = self.playing_notes.iter().position(|t| *t == (*chan, key)) {
                         self.playing_notes.remove(i);
                     }
                 }
@@ -135,6 +135,7 @@ impl Source for RedoxSynthSource {
                     for note in &self.playing_notes {
                         self.synth.note_off(note.0, note.1);
                     }
+                    self.playing_notes.clear();
                 }
             }
         }
