@@ -1291,7 +1291,7 @@ impl Synth {
         if best_voice_index < 0 as i32 {
             return 0 as *mut Voice;
         }
-        voice = self.voice[i as usize];
+        voice = self.voice[best_voice_index as usize];
         fluid_voice_off(voice);
         return voice;
     }
