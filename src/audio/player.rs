@@ -162,23 +162,25 @@ impl Player {
     fn scan_event_range(&mut self, range_start: usize, range_end: usize) {
         let notes = self.notes.lock().unwrap();
 
-        for (_, note) in notes.iter() {
+        let start_tick = (range_start / self.samples_per_tick) as i32;
+        let end_tick = (range_end / self.samples_per_tick) as i32;
+
+        for (_, note) in notes.get_notes_in_range(start_tick, end_tick) {
             let start_sample = note.tick as usize * self.samples_per_tick;
             let end_sample = start_sample + note.length as usize * self.samples_per_tick;
-            if start_sample >= range_start && start_sample < range_end {
-                self.controller.send_event(Event {
-                    sample: self.start_sample + start_sample - self.start_cursor,
-                    sequence: self.sequence,
-                    data: EventData::NoteOn(0, note.pitch.clone()),
-                });
-                self.sequence += 1;
-                self.controller.send_event(Event {
-                    sample: self.start_sample + end_sample - self.start_cursor,
-                    sequence: self.sequence,
-                    data: EventData::NoteOff(0, note.pitch.clone()),
-                });
-                self.sequence += 1;
-            }
+
+            self.controller.send_event(Event {
+                sample: self.start_sample + start_sample - self.start_cursor,
+                sequence: self.sequence,
+                data: EventData::NoteOn(0, note.pitch.clone()),
+            });
+            self.sequence += 1;
+            self.controller.send_event(Event {
+                sample: self.start_sample + end_sample - self.start_cursor,
+                sequence: self.sequence,
+                data: EventData::NoteOff(0, note.pitch.clone()),
+            });
+            self.sequence += 1;
         }
     }
 }

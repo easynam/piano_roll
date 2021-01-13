@@ -14,6 +14,7 @@ new_key_type! {
 pub struct Sequence {
     slotmap: SlotMap<NoteId, Note>,
     last_added: Option<NoteId>,
+    note_starts: Vec<(i32, NoteId)>
 }
 
 #[derive(Debug, Clone)]
@@ -27,24 +28,59 @@ impl Sequence {
     pub fn new() -> Self {
         Self {
             slotmap: SlotMap::with_key(),
-            last_added: None
+            last_added: None,
+            note_starts: vec![]
         }
     }
 
     pub fn update_sequence(&mut self, message: SequenceChange) {
         match message {
             SequenceChange::Add(note) => {
-                self.last_added = Some(self.slotmap.insert(note));
+                let new_id = self.slotmap.insert(note.clone());
+                self.last_added = Some(new_id);
+                let start_idx = self.note_starts
+                    .binary_search_by_key(&note.tick, |(tick, _id)| *tick)
+                    .unwrap_or_else(|idx| idx);
+
+                self.note_starts.insert(start_idx, (note.tick, new_id));
             },
             SequenceChange::Remove(id) => {
-                self.slotmap.remove(id);
+                if let Some(old_note) = self.slotmap.remove(id) {
+                    let _ = self.note_starts
+                        .binary_search(&(old_note.tick, id))
+                        .map(|idx| self.note_starts.remove(idx));
+                }
             },
             SequenceChange::Update(id, new_note) => {
                 if let Some(note) = self.slotmap.get_mut(id) {
-                    *note = new_note;
+                    let idx = self.note_starts
+                        .binary_search(&(note.tick, id));
+
+                    *note = new_note.clone();
+
+                    idx.map(|idx| self.note_starts.remove(idx));
+
+                    let start_idx = self.note_starts
+                        .binary_search_by_key(&new_note.tick, |(tick, _id)| *tick)
+                        .unwrap_or_else(|idx| idx);
+
+                    self.note_starts.insert(start_idx, (new_note.tick, id));
                 }
             },
         }
+    }
+
+    /// exclusive range
+    pub fn get_notes_in_range(&self, start_tick: i32, end_tick: i32) -> Vec<(NoteId, Note)> {
+        let start_idx = self.note_starts
+            .binary_search_by_key(&start_tick, |(tick, _id)| *tick)
+            .unwrap_or_else(|idx| idx);
+
+        let end_idx = self.note_starts
+            .binary_search_by_key(&end_tick, |(tick, _id)| *tick)
+            .unwrap_or_else(|idx| idx);
+
+        self.note_starts[start_idx..end_idx].iter().map(|(_tick, id)| (*id, self.slotmap.get(*id).unwrap().clone())).collect()
     }
 
     pub fn last_added(&self) -> Option<(NoteId, &Note)> {
