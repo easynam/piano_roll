@@ -74,13 +74,21 @@ impl Sequence {
 
     /// exclusive range
     pub fn get_notes_in_range(&self, start_tick: i32, end_tick: i32) -> Vec<(NoteId, Note)> {
-        let start_idx = self.note_starts
+        let mut start_idx = self.note_starts
             .binary_search_by_key(&start_tick, |(tick, _id)| *tick)
             .unwrap_or_else(|idx| idx);
 
-        let end_idx = self.note_starts
+        while start_idx > 0 && self.note_starts[start_idx - 1].0 >= start_tick {
+            start_idx -= 1;
+        }
+
+        let mut end_idx = self.note_starts
             .binary_search_by_key(&end_tick, |(tick, _id)| *tick)
             .unwrap_or_else(|idx| idx);
+
+        while end_idx > 0 && self.note_starts[end_idx - 1].0 >= end_tick {
+            end_idx -= 1;
+        }
 
         self.note_starts[start_idx..end_idx].iter().map(|(_tick, id)| (*id, self.slotmap.get(*id).unwrap().clone())).collect()
     }
