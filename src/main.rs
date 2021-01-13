@@ -9,7 +9,7 @@ use audio::Status;
 use widgets::piano_roll::{PianoRoll, PianoRollSettings};
 use widgets::piano_roll;
 
-use crate::audio::{Command, Synth};
+use crate::audio::{Command, Synth, PlaybackState};
 use crate::scroll_zoom::{ScrollScaleAxis, ScrollScaleAxisChange, ScrollZoomState};
 use crate::sequence::{Sequence, SequenceChange};
 use crate::widgets::piano_roll::{PianoRollMessage};
@@ -37,8 +37,7 @@ struct App {
     play_button: button::State,
     stop_button: button::State,
     synth_channel: Option<Sender<Command>>,
-    playback_cursor: i32,
-    playback_start_cursor: i32,
+    playback_state: PlaybackState,
 }
 
 #[derive(Debug, Clone)]
@@ -72,8 +71,7 @@ impl Application for App {
                 play_button: button::State::new(),
                 stop_button: button::State::new(),
                 synth_channel: None,
-                playback_cursor: 0,
-                playback_start_cursor: 0,
+                playback_state: PlaybackState::new(),
             },
             iced::Command::none(),
         )
@@ -120,8 +118,8 @@ impl Application for App {
                     channel.try_send(Command::SetNotes(self.notes.clone()));
                     self.synth_channel = Some(channel);
                 },
-                Status::PlaybackCursorUpdated(pos) => {
-                    self.playback_cursor = pos;
+                Status::PlaybackStateUpdated(state) => {
+                    self.playback_state = state;
                 }
             }
         }
@@ -148,7 +146,7 @@ impl Application for App {
                     Message::SynthCommand,
                     &self.scroll_zoom,
                     &self.settings,
-                    &self.playback_cursor
+                    &self.playback_state
                 ))
                 .push(ScrollZoomBar::new(
                     &mut self.scroll_bar_2,

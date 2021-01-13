@@ -37,7 +37,24 @@ pub enum Command {
 #[derive(Debug, Clone)]
 pub enum Status {
     CommandChannel(Sender<Command>),
-    PlaybackCursorUpdated(i32),
+    PlaybackStateUpdated(PlaybackState),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PlaybackState {
+    pub playback_cursor: i32,
+    pub playback_start_cursor: i32,
+    pub playing: bool,
+}
+
+impl PlaybackState {
+    pub fn new() -> Self {
+        Self {
+            playback_cursor: 0,
+            playback_start_cursor: 0,
+            playing: false
+        }
+    }
 }
 
 pub struct Synth {
@@ -67,7 +84,8 @@ impl Synth {
         }
 
         let mut sample_pos = 0;
-        let mut cursor_pos = 0;
+        let mut playback_state = PlaybackState::new();
+        let mut last_playback_state = playback_state.clone();
         let mut emitter = AudioEmitter::new();
         let config = emitter.get_config();
         let (controller, source) = RedoxSynthGenerator::new(config.sample_rate.0 as f32, "gm.sf2")
@@ -84,17 +102,21 @@ impl Synth {
                 match command {
                     Command::Play => {
                         player.play(sample_pos);
+                        playback_state.playing = true;
                     },
                     Command::Stop => {
                         player.pause();
                         player.seek(sample_pos, start_cursor);
+                        playback_state.playing = false;
                     },
                     Command::Pause => {
                         player.pause();
+                        playback_state.playing = false;
                     },
                     Command::Seek(seek_pos) => {
                         player.seek(sample_pos, seek_pos);
                         start_cursor = seek_pos;
+                        playback_state.playback_start_cursor = seek_pos;
                     },
                     Command::StartPreview(pitch) => player.play_preview(pitch),
                     Command::StopPreview => player.stop_preview(),
@@ -102,10 +124,10 @@ impl Synth {
                 }
             }
 
-            let new_cursor_pos = player.get_position();
-            if cursor_pos != new_cursor_pos {
-                cursor_pos = new_cursor_pos;
-                self.send.try_send(Status::PlaybackCursorUpdated(cursor_pos));
+            playback_state.playback_cursor = player.get_position();
+            if playback_state != last_playback_state {
+                last_playback_state = playback_state.clone();
+                self.send.try_send(Status::PlaybackStateUpdated(playback_state.clone()));
             }
 
             while let Ok(Some(samples)) = samples_receiver.try_next() {

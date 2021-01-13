@@ -9,7 +9,7 @@ use iced_native::layout::{Limits, Node};
 use iced_native::mouse::Interaction;
 use iced_wgpu::{Defaults, Primitive, Renderer};
 
-use crate::audio::Command;
+use crate::audio::{Command, PlaybackState};
 use crate::helpers::RectangleHelpers;
 use crate::scroll_zoom::ScrollZoomState;
 use crate::sequence::{Note, NoteId, Pitch, Sequence, SequenceChange};
@@ -28,7 +28,7 @@ pub struct PianoRoll<'a, Message> {
     on_synth_command: Box<dyn Fn(Command) -> Message + 'a>,
     scroll_zoom_state: &'a ScrollZoomState,
     settings: &'a PianoRollSettings,
-    playback_cursor: &'a i32,
+    playback_state: &'a PlaybackState,
 }
 
 pub struct PianoRollState {
@@ -129,7 +129,7 @@ impl<'a, Message> PianoRoll<'a, Message> {
         on_synth_command: FS,
         scroll_zoom_state: &'a ScrollZoomState,
         settings: &'a PianoRollSettings,
-        playback_cursor: &'a i32,
+        playback_state: &'a PlaybackState,
     ) -> Self
         where
             F: 'a + Fn(SequenceChange) -> Message,
@@ -144,7 +144,7 @@ impl<'a, Message> PianoRoll<'a, Message> {
             on_self_change: Box::new(on_self_change),
             on_synth_command: Box::new(on_synth_command),
             settings,
-            playback_cursor
+            playback_state,
         }
     }
 
@@ -239,7 +239,7 @@ impl<'a, Message> PianoRoll<'a, Message> {
     }
 
     fn draw_cursor(&self, bounds: Rectangle) -> Primitive {
-        let x = *self.playback_cursor as f32 * self.scroll_zoom_state.x.scale(bounds.width);
+        let x = self.playback_state.playback_cursor as f32 * self.scroll_zoom_state.x.scale(bounds.width);
         Primitive::Quad {
             bounds: Rectangle {
                 x: (x - self.scroll_zoom_state.x.view_start * self.scroll_zoom_state.x.scale(bounds.width) + bounds.x).round(),
