@@ -100,17 +100,23 @@ impl Source for RedoxSynthSource {
             }
         }
 
-        let mut i = 0;
-        for event in self.events.iter().filter(|e| e.sample < sample + length) {
-            if event.sample > sample + i {
-                let gen_samples = event.sample - (sample + i);
+        let mut generated_frames = 0;
+        let mut iter_index = 0;
+
+        for event in &self.events {
+            if event.sample >= sample + length {
+                break;
+            }
+
+            if event.sample > sample + generated_frames {
+                let gen_samples = event.sample - (sample + generated_frames);
 
                 // TODO: hardcoded channel count
                 self.synth
-                    .write(&mut data[i * 2..(i + gen_samples) * 2])
+                    .write(&mut data[generated_frames * 2..(generated_frames + gen_samples) * 2])
                     .unwrap();
 
-                i += gen_samples;
+                generated_frames += gen_samples;
             }
 
             match &event.data {
@@ -138,11 +144,13 @@ impl Source for RedoxSynthSource {
                     self.playing_notes.clear();
                 }
             }
+
+            iter_index += 1;
         }
 
-        self.events.retain(|e| e.sample >= sample + length);
+        self.events.drain(0..iter_index);
 
         // TODO: hardcoded channel count
-        self.synth.write(&mut data[i * 2..length * 2]).unwrap();
+        self.synth.write(&mut data[generated_frames * 2..length * 2]).unwrap();
     }
 }
