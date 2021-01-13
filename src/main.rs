@@ -133,7 +133,8 @@ impl Application for App {
                     &self.scroll_zoom.x,
                     &self.settings,
                     Message::SynthCommand,
-                    &mut self.timeline
+                    &mut self.timeline,
+                    &self.playback_state,
                 ))
                 .push(Space::new(Length::Units(20), Length::Shrink))
             )
@@ -146,14 +147,14 @@ impl Application for App {
                     Message::SynthCommand,
                     &self.scroll_zoom,
                     &self.settings,
-                    &self.playback_state
+                    &self.playback_state,
                 ))
                 .push(ScrollZoomBar::new(
                     &mut self.scroll_bar_2,
                     &self.scroll_zoom.y,
                     Message::Scroll2,
                     Orientation::Vertical,
-                    false
+                    false,
                 ))
                 .height(Length::Fill)
             )
@@ -163,7 +164,7 @@ impl Application for App {
                     &self.scroll_zoom.x,
                     Message::Scroll,
                     Orientation::Horizontal,
-                    true
+                    true,
                 ))
                 .push(Space::new(Length::Units(20), Length::Shrink))
             )

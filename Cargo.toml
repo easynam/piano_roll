@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 
 iced = "0.2.0"
+iced_graphics = { version = "0.1.0", features = ["canvas"] }
 iced_native = "0.3.0"
 iced_wgpu = "0.3.0"
 num-rational = "0.3.2"
