@@ -2,7 +2,7 @@ use std::{fmt::Debug, sync::{Arc, Mutex}};
 use std::thread;
 
 use iced::{Application, Column, Element, Error, futures::{self, channel::mpsc::Sender}, Row, Settings, Subscription};
-use iced_native::{Button, Text, Space, Length};
+use iced_native::{Button, Text, Space, Length, subscription, keyboard, Event};
 use iced_native::widget::button;
 
 use audio::Status;
@@ -15,6 +15,7 @@ use crate::sequence::{Sequence, SequenceChange};
 use crate::widgets::piano_roll::{PianoRollMessage};
 use crate::widgets::scroll_bar::{Orientation, ScrollZoomBar, ScrollZoomBarState};
 use crate::widgets::timeline::{Timeline, TimelineState};
+use iced::keyboard::KeyCode;
 
 mod audio;
 mod sequence;
@@ -48,6 +49,7 @@ enum Message {
     PianoRoll(PianoRollMessage),
     SynthCommand(Command),
     SynthStatus(Status),
+    PlayOrStop,
 }
 
 impl Application for App {
@@ -122,6 +124,14 @@ impl Application for App {
                     self.playback_state = state;
                 }
             }
+            Message::PlayOrStop => {
+                if let Some(channel) = self.synth_channel.as_mut() {
+                    match self.playback_state.playing {
+                        true => channel.try_send(Command::Stop),
+                        false => channel.try_send(Command::Play)
+                    };
+                }
+            }
         }
         iced::Command::none()
     }
@@ -179,7 +189,18 @@ impl Application for App {
     }
 
     fn subscription(&self) -> Subscription<Self::Message> {
-        Subscription::from_recipe(SynthThread("main synth thread")).map(|x| Message::SynthStatus(x))
+        Subscription::batch(vec![
+            Subscription::from_recipe(SynthThread("main synth thread")).map(|x| Message::SynthStatus(x)),
+            subscription::events_with(|event, _status| {
+                match event {
+                    Event::Keyboard(keyboard::Event::KeyPressed { key_code, .. }) => match key_code {
+                        KeyCode::Space => Some(Message::PlayOrStop),
+                        _ => None
+                    }
+                    _ => None
+                }
+            })
+        ])
     }
 }
 
