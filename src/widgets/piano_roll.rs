@@ -589,6 +589,20 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                                     if !self.state.selection.contains(&id) {
                                         self.state.selection.clear();
                                     }
+                                    if self.state.modifiers.shift {
+                                        match self.state.selection.is_empty() {
+                                            true => {
+                                                messages.push((self.on_change)(Add((*note).clone())))
+                                            },
+                                            false => {
+                                                for id in &self.state.selection {
+                                                    notes.get(*id).map(|note| {
+                                                        messages.push((self.on_change)(Add(note.clone())))
+                                                    });
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             },
                             CanResize(id) => {
