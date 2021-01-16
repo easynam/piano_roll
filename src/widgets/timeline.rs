@@ -10,7 +10,7 @@ use crate::widgets::tick_grid::LineType;
 use crate::audio::{Command, PlaybackState};
 use iced_native::event::Status;
 use iced_native::keyboard::Modifiers;
-use std::cmp::max;
+use std::cmp::{max, min};
 use iced_graphics::widget::canvas::{Frame, Path, Stroke};
 
 pub struct Timeline<'a, Message> {
@@ -39,6 +39,7 @@ impl TimelineState {
 pub enum Action {
     None,
     Seeking,
+    Selecting(i32),
 }
 
 impl<'a, Message> Timeline<'a, Message> {
@@ -56,14 +57,29 @@ impl<'a, Message> Timeline<'a, Message> {
     }
 
     fn seek(&mut self, cursor_position: Point, messages: &mut Vec<Message>, bounds: Rectangle) {
+        messages.push((self.on_synth_command)(Command::Seek(self.cursor_tick(cursor_position, bounds))));
+    }
+
+    fn select(&mut self, cursor_position: Point, messages: &mut Vec<Message>, bounds: Rectangle, start_tick: i32) {
+        let end_tick = self.cursor_tick(cursor_position, bounds);
+
+        if start_tick == end_tick {
+            messages.push((self.on_synth_command)(Command::SetLoop(None)));
+        } else {
+            let from_tick = min(start_tick, end_tick);
+            let to_tick = max(start_tick, end_tick);
+
+            messages.push((self.on_synth_command)(Command::SetLoop(Some((from_tick, to_tick)))))
+        }
+    }
+
+    fn cursor_tick(&self, cursor_position: Point, bounds: Rectangle) -> i32 {
         let mut cursor_tick = self.scroll.screen_to_inner(cursor_position.x, bounds.x, bounds.width) as i32;
 
         if !self.state.modifiers.alt {
             cursor_tick = self.settings.tick_grid.quantize_tick(cursor_tick);
         }
-        cursor_tick = max(0, cursor_tick);
-
-        messages.push((self.on_synth_command)(Command::Seek(cursor_tick)));
+        max(0, cursor_tick)
     }
 }
 
@@ -151,22 +167,42 @@ impl<'a, Message> Widget<Message, Renderer> for Timeline<'a, Message> {
             })
             .collect();
 
-        let playback_cursor_x = self.scroll.inner_to_screen(self.playback_state.playback_cursor as f32, bounds.x, bounds.width) - 15.0;
+        let cursor = {
+            let playback_cursor_x = self.scroll.inner_to_screen(self.playback_state.playback_cursor as f32, bounds.x, bounds.width) - 15.0;
 
-        let mut frame = Frame::new(Size::new(30.0,30.0));
-        let path = Path::new(|path| {
-            path.move_to(Point::new(15.0,28.0));
-            path.line_to(Point::new(2.0,15.0));
-            path.line_to(Point::new(28.0,15.0));
-            path.close();
-        });
-        frame.fill(&path, Color::from_rgb(0.8, 0.8, 0.8));
-        frame.stroke(&path, Stroke::default().with_color(Color::from_rgb(0.0, 0.0, 0.0)));
+            let mut frame = Frame::new(Size::new(30.0,30.0));
+            let path = Path::new(|path| {
+                path.move_to(Point::new(15.0,28.0));
+                path.line_to(Point::new(2.0,15.0));
+                path.line_to(Point::new(28.0,15.0));
+                path.close();
+            });
+            frame.fill(&path, Color::from_rgb(0.8, 0.8, 0.8));
+            frame.stroke(&path, Stroke::default().with_color(Color::from_rgb(0.0, 0.0, 0.0)));
 
-        let cursor = Primitive::Translate {
-            translation: Vector::new(playback_cursor_x, bounds.y),
-            content: Box::new(frame.into_geometry().into_primitive()),
+            Primitive::Translate {
+                translation: Vector::new(playback_cursor_x, bounds.y),
+                content: Box::new(frame.into_geometry().into_primitive()),
+            }
         };
+
+        let selection_box = self.playback_state.looping.map(|(start, end)| {
+            let x = self.scroll.inner_to_screen(start as f32, bounds.x, bounds.width);
+            let width = self.scroll.inner_to_screen(end as f32, bounds.x, bounds.width) - x;
+
+            Primitive::Quad {
+                bounds: Rectangle {
+                    x,
+                    y: bounds.y,
+                    width,
+                    height: bounds.height,
+                },
+                background: Background::Color(Color::from_rgb(0.6, 0.2, 0.2)),
+                border_radius: 0.0,
+                border_width: 0.0,
+                border_color: Default::default()
+            }
+        }).unwrap_or(Primitive::None);
 
         (
             Primitive::Clip {
@@ -181,6 +217,7 @@ impl<'a, Message> Widget<Message, Renderer> for Timeline<'a, Message> {
                             border_width: 0.0,
                             border_color: Color::BLACK,
                         },
+                        selection_box,
                         Primitive::Group {
                             primitives: bar_lines,
                         },
@@ -200,6 +237,8 @@ impl<'a, Message> Widget<Message, Renderer> for Timeline<'a, Message> {
     }
 
     fn on_event(&mut self, event: Event, layout: Layout<'_>, cursor_position: Point, messages: &mut Vec<Message>, _renderer: &Renderer, _clipboard: Option<&dyn Clipboard>) -> Status {
+        let bounds = layout.bounds();
+
         match event {
             Event::Mouse(event) => match event {
                 mouse::Event::CursorMoved { .. } => {
@@ -213,13 +252,26 @@ impl<'a, Message> Widget<Message, Renderer> for Timeline<'a, Message> {
 
                             Status::Captured
                         }
+                        Action::Selecting(start_position) => {
+                            self.select(cursor_position, messages, bounds, start_position);
+
+                            Status::Captured
+                        }
                     }
                 }
                 mouse::Event::ButtonPressed(mouse::Button::Left) => {
-                    let bounds = layout.bounds();
                     if bounds.contains(cursor_position) {
-                        self.state.action = Action::Seeking;
-                        self.seek(cursor_position, messages, bounds);
+                        match self.state.modifiers.control {
+                            true => {
+                                let cursor_tick = self.cursor_tick(cursor_position, bounds);
+                                self.state.action = Action::Selecting(cursor_tick);
+                                self.select(cursor_position, messages, bounds, cursor_tick);
+                            }
+                            false => {
+                                self.state.action = Action::Seeking;
+                                self.seek(cursor_position, messages, bounds);
+                            }
+                        }
 
                         Status::Captured
                     } else {

@@ -550,7 +550,10 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                 }
                 mouse::Event::ButtonPressed(mouse::Button::Left) => {
                     if self.state.modifiers.control {
-                        messages.push((self.on_self_change)(PianoRollMessage::Action(Selecting(cursor_tick, cursor_note))));
+                        match self.state.hover {
+                            HoverState::OutOfBounds => {}
+                            _ => messages.push((self.on_self_change)(PianoRollMessage::Action(Selecting(cursor_tick, cursor_note))))
+                        }
                     } else {
                         match self.state.hover {
                             HoverState::OutOfBounds => {}

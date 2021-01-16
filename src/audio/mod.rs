@@ -30,6 +30,7 @@ pub enum Command {
     Pause,
     Stop,
     Seek(i32),
+    SetLoop(Option<(i32, i32)>),
     StartPreview(Pitch),
     StopPreview,
 }
@@ -45,6 +46,7 @@ pub struct PlaybackState {
     pub playback_cursor: i32,
     pub playback_start_cursor: i32,
     pub playing: bool,
+    pub looping: Option<(i32,i32)>
 }
 
 impl PlaybackState {
@@ -52,7 +54,8 @@ impl PlaybackState {
         Self {
             playback_cursor: 0,
             playback_start_cursor: 0,
-            playing: false
+            playing: false,
+            looping: None,
         }
     }
 }
@@ -120,7 +123,11 @@ impl Synth {
                     },
                     Command::StartPreview(pitch) => player.play_preview(pitch),
                     Command::StopPreview => player.stop_preview(),
-                    Command::SetNotes(_) => panic!("SetNotes after init")
+                    Command::SetNotes(_) => panic!("SetNotes after init"),
+                    Command::SetLoop(looping) => {
+                        player.set_loop(looping);
+                        playback_state.looping = looping;
+                    }
                 }
             }
 
