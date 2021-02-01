@@ -9,7 +9,7 @@ use iced_native::layout::{Limits, Node};
 use iced_native::mouse::Interaction;
 use iced_wgpu::{Defaults, Primitive, Renderer};
 
-use crate::audio::{Command, PlaybackState};
+use crate::audio::{SynthCommand, PlaybackState};
 use crate::helpers::RectangleHelpers;
 use crate::scroll_zoom::ScrollZoomState;
 use crate::sequence::{Note, NoteId, Pitch, Sequence, SequenceChange};
@@ -25,7 +25,7 @@ pub struct PianoRoll<'a, Message> {
     notes: &'a Mutex<Sequence>,
     on_change: Box<dyn Fn(SequenceChange) -> Message + 'a>,
     on_self_change: Box<dyn Fn(PianoRollMessage) -> Message + 'a>,
-    on_synth_command: Box<dyn Fn(Command) -> Message + 'a>,
+    on_synth_command: Box<dyn Fn(SynthCommand) -> Message + 'a>,
     scroll_zoom_state: &'a ScrollZoomState,
     settings: &'a PianoRollSettings,
     playback_state: &'a PlaybackState,
@@ -93,9 +93,6 @@ impl Default for PianoRollState {
 }
 
 impl PianoRollState {
-    pub fn new() -> PianoRollState {
-        PianoRollState::default()
-    }
     pub fn on_event(&mut self, event: PianoRollMessage, notes: &Sequence) {
         match event {
             PianoRollMessage::Action(action) => self.action = action,
@@ -134,7 +131,7 @@ impl<'a, Message> PianoRoll<'a, Message> {
         where
             F: 'a + Fn(SequenceChange) -> Message,
             FA: 'a + Fn(PianoRollMessage) -> Message,
-            FS: 'a + Fn(Command) -> Message,
+            FS: 'a + Fn(SynthCommand) -> Message,
     {
         Self {
             state,
@@ -182,12 +179,12 @@ impl<'a, Message> PianoRoll<'a, Message> {
     fn update_hover(&mut self, layout: Layout, cursor_position: Point, bounds: Rectangle, notes: &Sequence) {
         if layout.bounds().contains(cursor_position) {
             let resize = notes.iter()
-                .find(|(id, note)| {
+                .find(|(_id, note)| {
                     self.note_resize_rect(note, bounds).contains(cursor_position)
                 });
 
             let hovered = notes.iter()
-                .find(|(id, note)| {
+                .find(|(_id, note)| {
                     self.note_rect(note, bounds).contains(cursor_position)
                 });
 
@@ -490,7 +487,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                                         messages.push( (self.on_change)(Update(note_id, new_note.clone())));
                                     }
                                     if &note.pitch != &new_note.pitch {
-                                        messages.push((self.on_synth_command)(Command::StartPreview(new_note.pitch.clone())));
+                                        messages.push((self.on_synth_command)(SynthCommand::StartPreview(new_note.pitch.clone())));
                                     }
                                 }
                             }
@@ -571,13 +568,13 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                                             false => self.settings.tick_grid.grid_size(tick),
                                         };
                                         let note = Note { tick, pitch: cursor_note.clone(), length };
-                                        messages.push((self.on_synth_command)(Command::StartPreview(note.pitch.clone())));
+                                        messages.push((self.on_synth_command)(SynthCommand::StartPreview(note.pitch.clone())));
                                         messages.push( (self.on_change)(Add(note)));
                                         messages.push((self.on_self_change)(PianoRollMessage::ResizeLastCreatedNote(cursor_tick)));
                                     }
-                                    false => {
+                                    false => { 
                                         let note = Note { tick, pitch: cursor_note.clone(), length: 32 };
-                                        messages.push((self.on_synth_command)(Command::StartPreview(note.pitch.clone())));
+                                        messages.push((self.on_synth_command)(SynthCommand::StartPreview(note.pitch.clone())));
                                         messages.push( (self.on_change)(Add(note)));
                                         messages.push((self.on_self_change)(PianoRollMessage::DragLastCreatedNote(cursor_tick)));
                                     }
@@ -588,7 +585,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                             CanDrag(id) => {
                                 if let Some(note) = &notes.get(id) {
                                     messages.push((self.on_self_change)(PianoRollMessage::Action(Dragging(id, cursor_tick - note.tick))));
-                                    messages.push((self.on_synth_command)(Command::StartPreview(note.pitch.clone())));
+                                    messages.push((self.on_synth_command)(SynthCommand::StartPreview(note.pitch.clone())));
                                     if !self.state.selection.contains(&id) {
                                         self.state.selection.clear();
                                     }
@@ -623,7 +620,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                 }
                 mouse::Event::ButtonReleased( .. ) => {
                     messages.push((self.on_self_change)(PianoRollMessage::Action(Action::None)));
-                    messages.push((self.on_synth_command)(Command::StopPreview));
+                    messages.push((self.on_synth_command)(SynthCommand::StopPreview));
                 }
                 _ => {}
             }

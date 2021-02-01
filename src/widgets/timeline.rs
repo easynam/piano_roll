@@ -7,7 +7,7 @@ use iced_wgpu::{Color, Defaults, Primitive, Renderer};
 use crate::scroll_zoom::ScrollScaleAxis;
 use crate::widgets::piano_roll::PianoRollSettings;
 use crate::widgets::tick_grid::LineType;
-use crate::audio::{Command, PlaybackState};
+use crate::audio::{SynthCommand, PlaybackState};
 use iced_native::event::Status;
 use iced_native::keyboard::Modifiers;
 use std::cmp::{max, min};
@@ -16,7 +16,7 @@ use iced_graphics::widget::canvas::{Frame, Path, Stroke};
 pub struct Timeline<'a, Message> {
     scroll: &'a ScrollScaleAxis,
     settings: &'a PianoRollSettings,
-    on_synth_command: Box<dyn Fn(Command) -> Message + 'a>,
+    on_synth_command: Box<dyn Fn(SynthCommand) -> Message + 'a>,
     state: &'a mut TimelineState,
     playback_state: &'a PlaybackState,
 }
@@ -51,25 +51,25 @@ impl<'a, Message> Timeline<'a, Message> {
         playback_state: &'a PlaybackState,
     ) -> Self
         where
-            FS: 'a + Fn(Command) -> Message,
+            FS: 'a + Fn(SynthCommand) -> Message,
     {
         Self { scroll, settings, on_synth_command: Box::new(on_synth_command), state, playback_state }
     }
 
     fn seek(&mut self, cursor_position: Point, messages: &mut Vec<Message>, bounds: Rectangle) {
-        messages.push((self.on_synth_command)(Command::Seek(self.cursor_tick(cursor_position, bounds))));
+        messages.push((self.on_synth_command)(SynthCommand::Seek(self.cursor_tick(cursor_position, bounds))));
     }
 
     fn select(&mut self, cursor_position: Point, messages: &mut Vec<Message>, bounds: Rectangle, start_tick: i32) {
         let end_tick = self.cursor_tick(cursor_position, bounds);
 
         if start_tick == end_tick {
-            messages.push((self.on_synth_command)(Command::SetLoop(None)));
+            messages.push((self.on_synth_command)(SynthCommand::SetLoop(None)));
         } else {
             let from_tick = min(start_tick, end_tick);
             let to_tick = max(start_tick, end_tick);
 
-            messages.push((self.on_synth_command)(Command::SetLoop(Some((from_tick, to_tick)))))
+            messages.push((self.on_synth_command)(SynthCommand::SetLoop(Some((from_tick, to_tick)))))
         }
     }
 

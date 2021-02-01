@@ -2,20 +2,16 @@ use std::{fmt::Debug, sync::{Arc, Mutex}};
 use std::thread;
 
 use iced::{Application, Column, Element, Error, futures::{self, channel::mpsc::Sender}, Row, Settings, Subscription};
-use iced_native::{Button, Text, Space, Length, subscription, keyboard, Event};
+use iced_native::{Button, Text, Length, subscription, keyboard, Event};
 use iced_native::widget::button;
 
 use audio::Status;
-use widgets::piano_roll::{PianoRoll, PianoRollSettings};
-use widgets::piano_roll;
+use widgets::piano_roll::PianoRollSettings;
 
-use crate::audio::{Command, Synth, PlaybackState};
-use crate::scroll_zoom::{ScrollScaleAxis, ScrollScaleAxisChange, ScrollZoomState};
+use crate::audio::{SynthCommand, Synth, PlaybackState};
 use crate::sequence::{Sequence, SequenceChange};
-use crate::widgets::piano_roll::{PianoRollMessage};
-use crate::widgets::scroll_bar::{Orientation, ScrollZoomBar, ScrollZoomBarState};
-use crate::widgets::timeline::{Timeline, TimelineState};
 use iced::keyboard::KeyCode;
+use crate::widgets::sequence_editor::{SequenceEditor, SequenceEditorSelfMessage, SequenceEditorMessage};
 
 mod audio;
 mod sequence;
@@ -28,28 +24,22 @@ pub fn main() -> Result<(), Error> {
 }
 
 struct App {
-    piano_roll: piano_roll::PianoRollState,
-    scroll_zoom: ScrollZoomState,
-    scroll_bar: ScrollZoomBarState,
-    scroll_bar_2: ScrollZoomBarState,
-    timeline: TimelineState,
     notes: Arc<Mutex<Sequence>>,
     settings: PianoRollSettings,
     play_button: button::State,
     stop_button: button::State,
-    synth_channel: Option<Sender<Command>>,
+    synth_channel: Option<Sender<SynthCommand>>,
     playback_state: PlaybackState,
+    sequence_editor: SequenceEditor,
 }
 
 #[derive(Debug, Clone)]
 enum Message {
     Sequence(SequenceChange),
-    Scroll(ScrollScaleAxisChange),
-    Scroll2(ScrollScaleAxisChange),
-    PianoRoll(PianoRollMessage),
-    SynthCommand(Command),
+    SynthCommand(SynthCommand),
     SynthStatus(Status),
     PlayOrStop,
+    SequenceEditorMessage(SequenceEditorSelfMessage),
 }
 
 impl Application for App {
@@ -60,20 +50,13 @@ impl Application for App {
     fn new(_flags: ()) -> (Self, iced::Command<Message>) {
         (
             App {
-                piano_roll: piano_roll::PianoRollState::new(),
-                scroll_zoom:ScrollZoomState {
-                    x: ScrollScaleAxis::new(0.0,32.0*32.0, 0.0, 32.0*32.0*4.0),
-                    y: ScrollScaleAxis::new(-1.5, 3.0, -4.0, 8.0),
-                },
-                scroll_bar: ScrollZoomBarState::new(),
-                scroll_bar_2: ScrollZoomBarState::new(),
-                timeline: TimelineState::new(),
                 notes: Arc::new(Mutex::new(Sequence::new())),
                 settings: PianoRollSettings::default(),
                 play_button: button::State::new(),
                 stop_button: button::State::new(),
                 synth_channel: None,
                 playback_state: PlaybackState::new(),
+                sequence_editor: Default::default(),
             },
             iced::Command::none(),
         )
@@ -89,35 +72,14 @@ impl Application for App {
                 let mut notes = self.notes.lock().unwrap();
                 notes.update_sequence(change);
             },
-            Message::Scroll(scroll) => match scroll {
-                ScrollScaleAxisChange::Left(new_pos) => {
-                    self.scroll_zoom.x.view_start = new_pos
-                },
-                ScrollScaleAxisChange::Right(new_pos) => {
-                    self.scroll_zoom.x.view_end = new_pos
-                },
-                _ => {}
-            },
-            Message::Scroll2(scroll) => match scroll {
-                ScrollScaleAxisChange::Left(new_pos) => {
-                    self.scroll_zoom.y.view_start = new_pos
-                },
-                ScrollScaleAxisChange::Right(new_pos) => {
-                    self.scroll_zoom.y.view_end = new_pos
-                },
-                _ => {}
-            },
             Message::SynthCommand(command) => {
                 if let Some(channel) = self.synth_channel.as_mut() {
                     channel.try_send(command);
                 }
             },
-            Message::PianoRoll(action) => {
-                self.piano_roll.on_event(action, &*self.notes.lock().unwrap());
-            }
             Message::SynthStatus(status) => match status {
                 Status::CommandChannel(mut channel) => {
-                    channel.try_send(Command::SetNotes(self.notes.clone()));
+                    channel.try_send(SynthCommand::SetNotes(self.notes.clone()));
                     self.synth_channel = Some(channel);
                 },
                 Status::PlaybackStateUpdated(state) => {
@@ -127,65 +89,16 @@ impl Application for App {
             Message::PlayOrStop => {
                 if let Some(channel) = self.synth_channel.as_mut() {
                     match self.playback_state.playing {
-                        true => channel.try_send(Command::Stop),
-                        false => channel.try_send(Command::Play)
+                        true => channel.try_send(SynthCommand::Stop),
+                        false => channel.try_send(SynthCommand::Play)
                     };
                 }
             }
+            Message::SequenceEditorMessage(message) => {
+                self.sequence_editor.update(message, &self.notes);
+            }
         }
         iced::Command::none()
-    }
-
-    fn view(&mut self) -> Element<Self::Message> {
-        Column::new()
-            .push(Row::new()
-                .push(Timeline::new(
-                    &self.scroll_zoom.x,
-                    &self.settings,
-                    Message::SynthCommand,
-                    &mut self.timeline,
-                    &self.playback_state,
-                ))
-                .push(Space::new(Length::Units(20), Length::Shrink))
-            )
-            .push(Row::new()
-                .push(PianoRoll::new(
-                    &mut self.piano_roll,
-                    self.notes.as_ref(),
-                    Message::Sequence,
-                    Message::PianoRoll,
-                    Message::SynthCommand,
-                    &self.scroll_zoom,
-                    &self.settings,
-                    &self.playback_state,
-                ))
-                .push(ScrollZoomBar::new(
-                    &mut self.scroll_bar_2,
-                    &self.scroll_zoom.y,
-                    Message::Scroll2,
-                    Orientation::Vertical,
-                    false,
-                ))
-                .height(Length::Fill)
-            )
-            .push(Row::new()
-                .push(ScrollZoomBar::new(
-                    &mut self.scroll_bar,
-                    &self.scroll_zoom.x,
-                    Message::Scroll,
-                    Orientation::Horizontal,
-                    true,
-                ))
-                .push(Space::new(Length::Units(20), Length::Shrink))
-            )
-            .push(Row::new()
-                .push(Button::new(&mut self.play_button, Text::new("Play"))
-                    .on_press(Message::SynthCommand(Command::Play)))
-                .push(Button::new(&mut self.stop_button, Text::new("Stop"))
-                    .on_press(Message::SynthCommand(Command::Stop)))
-                .height(Length::Units(50))
-            )
-            .into()
     }
 
     fn subscription(&self) -> Subscription<Self::Message> {
@@ -201,6 +114,27 @@ impl Application for App {
                 }
             })
         ])
+    }
+
+    fn view(&mut self) -> Element<Self::Message> {
+        Column::new()
+            .push(self.sequence_editor.view(
+                &self.notes, &self.settings, &self.playback_state
+            ).map(move |message| {
+                match message {
+                    SequenceEditorMessage::SelfMessage(content) => Message::SequenceEditorMessage(content),
+                    SequenceEditorMessage::SequenceChange(content) => Message::Sequence(content),
+                    SequenceEditorMessage::SynthCommand(content) => Message::SynthCommand(content),
+                }
+            }))
+            .push(Row::new()
+                .push(Button::new(&mut self.play_button, Text::new("Play"))
+                    .on_press(Message::SynthCommand(SynthCommand::Play)))
+                .push(Button::new(&mut self.stop_button, Text::new("Stop"))
+                    .on_press(Message::SynthCommand(SynthCommand::Stop)))
+                .height(Length::Shrink)
+            )
+            .into()
     }
 }
 

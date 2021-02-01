@@ -24,7 +24,7 @@ use self::{
 };
 
 #[derive(Debug, Clone)]
-pub enum Command {
+pub enum SynthCommand {
     SetNotes(Arc<Mutex<Sequence>>),
     Play,
     Pause,
@@ -37,7 +37,7 @@ pub enum Command {
 
 #[derive(Debug, Clone)]
 pub enum Status {
-    CommandChannel(Sender<Command>),
+    CommandChannel(Sender<SynthCommand>),
     PlaybackStateUpdated(PlaybackState),
 }
 
@@ -61,7 +61,7 @@ impl PlaybackState {
 }
 
 pub struct Synth {
-    recv: Receiver<Command>,
+    recv: Receiver<SynthCommand>,
     send: Sender<Status>,
 }
 
@@ -78,7 +78,7 @@ impl Synth {
 
         loop {
             match self.recv.try_next() {
-                Ok(Some(Command::SetNotes(n))) => {
+                Ok(Some(SynthCommand::SetNotes(n))) => {
                     notes = n;
                     break;
                 }
@@ -103,28 +103,28 @@ impl Synth {
         loop {
             while let Ok(Some(command)) = self.recv.try_next() {
                 match command {
-                    Command::Play => {
+                    SynthCommand::Play => {
                         player.play(sample_pos);
                         playback_state.playing = true;
                     },
-                    Command::Stop => {
+                    SynthCommand::Stop => {
                         player.pause();
                         player.seek(sample_pos, start_cursor);
                         playback_state.playing = false;
                     },
-                    Command::Pause => {
+                    SynthCommand::Pause => {
                         player.pause();
                         playback_state.playing = false;
                     },
-                    Command::Seek(seek_pos) => {
+                    SynthCommand::Seek(seek_pos) => {
                         player.seek(sample_pos, seek_pos);
                         start_cursor = seek_pos;
                         playback_state.playback_start_cursor = seek_pos;
                     },
-                    Command::StartPreview(pitch) => player.play_preview(pitch),
-                    Command::StopPreview => player.stop_preview(),
-                    Command::SetNotes(_) => panic!("SetNotes after init"),
-                    Command::SetLoop(looping) => {
+                    SynthCommand::StartPreview(pitch) => player.play_preview(pitch),
+                    SynthCommand::StopPreview => player.stop_preview(),
+                    SynthCommand::SetNotes(_) => panic!("SetNotes after init"),
+                    SynthCommand::SetLoop(looping) => {
                         player.set_loop(looping);
                         playback_state.looping = looping;
                     }
