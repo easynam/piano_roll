@@ -5,6 +5,7 @@ use std::ops::{Neg, Add, Sub, Div};
 use num_bigint::BigInt;
 use slotmap::{new_key_type, SlotMap};
 use slotmap::basic::Iter;
+use num_traits::Zero;
 
 new_key_type! {
     pub struct NoteId;
@@ -139,6 +140,12 @@ impl Neg for Pitch {
 
     fn neg(self) -> Self::Output {
         Pitch(self.0.neg())
+    }
+}
+
+impl Default for Pitch {
+    fn default() -> Self {
+        Pitch(Rational32::zero())
     }
 }
 

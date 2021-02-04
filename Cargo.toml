@@ -19,6 +19,7 @@ cpal = "0.13.1"
 crossbeam = "0.8.0"
 redoxsynth = { path = "crates/redoxsynth" }
 slotmap = "1.0.2"
+derive_more = "0.99.11"
 
 [workspace]
 members = ["crates/*"]

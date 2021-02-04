@@ -1,10 +1,9 @@
 use std::{cmp::max, sync::Mutex};
 use std::cmp::min;
 
-use iced::Element;
+use iced::{Element};
 use iced_native::{Background, Clipboard, Color, Event, Hasher, keyboard, Layout, Length, mouse, Point, Rectangle, Vector, Widget};
 use iced_native::event::Status;
-use iced_native::keyboard::Modifiers;
 use iced_native::layout::{Limits, Node};
 use iced_native::mouse::Interaction;
 use iced_wgpu::{Defaults, Primitive, Renderer};
@@ -12,31 +11,26 @@ use iced_wgpu::{Defaults, Primitive, Renderer};
 use crate::audio::{SynthCommand, PlaybackState};
 use crate::helpers::RectangleHelpers;
 use crate::scroll_zoom::ScrollZoomState;
-use crate::sequence::{Note, NoteId, Pitch, Sequence, SequenceChange};
-use crate::sequence::SequenceChange::{Add, Remove, Update};
-use crate::widgets::piano_roll::Action::{Dragging, Resizing, Selecting};
-use crate::widgets::piano_roll::HoverState::{CanDrag, CanResize, OutOfBounds};
+use crate::sequence::{Note, Pitch, Sequence, SequenceChange};
+use crate::sequence::SequenceChange::{Add};
+use crate::widgets::piano_roll::state::Action::{Dragging, Resizing, Selecting};
+use crate::widgets::piano_roll::state::HoverState::{CanDrag, CanResize, OutOfBounds};
 use crate::widgets::pitch_grid::{PitchGrid, TetGrid};
 use crate::widgets::pitch_grid;
 use crate::widgets::tick_grid::{LineType, SimpleGrid, TickGrid};
+use crate::widgets::piano_roll::state::{PianoRollState, Action, Cursor, HoverState, PianoRollSelfMessage};
 
-pub struct PianoRoll<'a, Message> {
+pub mod state;
+
+pub struct PianoRoll<'a> {
     state: &'a mut PianoRollState,
     notes: &'a Mutex<Sequence>,
-    on_change: Box<dyn Fn(SequenceChange) -> Message + 'a>,
-    on_self_change: Box<dyn Fn(PianoRollMessage) -> Message + 'a>,
-    on_synth_command: Box<dyn Fn(SynthCommand) -> Message + 'a>,
     scroll_zoom_state: &'a ScrollZoomState,
     settings: &'a PianoRollSettings,
     playback_state: &'a PlaybackState,
+    mouse_enabled: bool,
 }
 
-pub struct PianoRollState {
-    action: Action,
-    hover: HoverState,
-    modifiers: Modifiers,
-    selection: Vec<NoteId>,
-}
 
 pub struct PianoRollSettings {
     pub(crate) tick_grid: Box<dyn TickGrid>,
@@ -65,83 +59,30 @@ impl Default for PianoRollSettings {
     }
 }
 
-enum HoverState {
-    None,
-    OutOfBounds,
-    CanDrag(NoteId),
-    CanResize(NoteId),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Action {
-    None,
-    Deleting,
-    Dragging(NoteId, i32),
-    Resizing(NoteId, i32),
-    Selecting(i32, Pitch),
-}
-
-impl Default for PianoRollState {
-    fn default() -> Self {
-        PianoRollState {
-            action: Action::None,
-            hover: HoverState::None,
-            modifiers: Modifiers::default(),
-            selection: vec![],
-        }
-    }
-}
-
-impl PianoRollState {
-    pub fn on_event(&mut self, event: PianoRollMessage, notes: &Sequence) {
-        match event {
-            PianoRollMessage::Action(action) => self.action = action,
-            PianoRollMessage::DragLastCreatedNote(cursor_tick) => {
-                if let Some((id, note)) = notes.last_added() {
-                    self.action = Dragging(id, cursor_tick - note.tick);
-                }
-            }
-            PianoRollMessage::ResizeLastCreatedNote(cursor_tick) => {
-                if let Some((id, note)) = notes.last_added() {
-                    self.action = Resizing(id, cursor_tick - note.tick);
-                }
-            }
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub enum PianoRollMessage {
-    Action(Action),
-    DragLastCreatedNote(i32),
-    ResizeLastCreatedNote(i32),
+    SelfMessage(PianoRollSelfMessage),
+    SynthCommand(SynthCommand),
+    SequenceChange(SequenceChange),
 }
 
-impl<'a, Message> PianoRoll<'a, Message> {
-    pub fn new<F, FA, FS>(
+impl<'a> PianoRoll<'a> {
+    pub fn new(
         state: &'a mut PianoRollState,
         notes: &'a Mutex<Sequence>,
-        on_change: F,
-        on_self_change: FA,
-        on_synth_command: FS,
         scroll_zoom_state: &'a ScrollZoomState,
         settings: &'a PianoRollSettings,
         playback_state: &'a PlaybackState,
+        mouse_enabled: bool,
     ) -> Self
-        where
-            F: 'a + Fn(SequenceChange) -> Message,
-            FA: 'a + Fn(PianoRollMessage) -> Message,
-            FS: 'a + Fn(SynthCommand) -> Message,
     {
         Self {
             state,
             notes,
             scroll_zoom_state,
-            on_change: Box::new(on_change),
-            on_self_change: Box::new(on_self_change),
-            on_synth_command: Box::new(on_synth_command),
             settings,
             playback_state,
+            mouse_enabled,
         }
     }
 
@@ -216,22 +157,6 @@ impl<'a, Message> PianoRoll<'a, Message> {
             }
         } else {
             self.state.hover = OutOfBounds
-        }
-    }
-
-    fn delete_hovered(&mut self, messages: &mut Vec<Message>) {
-        match self.state.hover {
-            HoverState::None => {
-                messages.push((self.on_self_change)(PianoRollMessage::Action(Action::Deleting)));
-            },
-            CanDrag(id) => {
-                messages.push((self.on_change)(Remove(id)));
-                messages.push((self.on_self_change)(PianoRollMessage::Action(Action::Deleting)));
-            },
-            CanResize(_) => {
-                messages.push((self.on_self_change)(PianoRollMessage::Action(Action::Deleting)));
-            },
-            _ => {},
         }
     }
 
@@ -331,7 +256,7 @@ impl<'a, Message> PianoRoll<'a, Message> {
     }
 }
 
-impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
+impl<'a> Widget<PianoRollMessage, Renderer> for PianoRoll<'a> {
     fn width(&self) -> Length {
         Length::Fill
     }
@@ -349,14 +274,13 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
         _renderer: &mut Renderer,
         _defaults: &Defaults,
         layout: Layout<'_>,
-        cursor_position: Point,
+        _cursor_position: Point,
         _viewport: &Rectangle,
     ) -> (Primitive, Interaction) {
         let bounds = layout.bounds();
 
-        let inner_cursor = self.scroll_zoom_state.screen_to_inner(cursor_position, &bounds);
-        let cursor_tick = inner_cursor.x as i32;
-        let cursor_note = Pitch::new(-(12.0 * inner_cursor.y).round() as i32, 12);
+        let cursor_tick = self.state.cursor.tick;
+        let cursor_note = &self.state.cursor.pitch;
 
         let cursor_lines = self.draw_cursor(bounds);
         let tick_grid_lines = self.draw_tick_grid(bounds);
@@ -435,121 +359,36 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
         // use std::hash::Hash;
     }
 
-    fn on_event(&mut self, event: Event, layout: Layout<'_>, cursor_position: Point, messages: &mut Vec<Message>, _renderer: &Renderer, _clipboard: Option<&dyn Clipboard>) -> Status {
+    fn on_event(&mut self, event: Event, layout: Layout<'_>, cursor_position: Point, messages: &mut Vec<PianoRollMessage>, _renderer: &Renderer, _clipboard: Option<&dyn Clipboard>) -> Status {
         let bounds = layout.bounds();
-
-        let inner_cursor = self.scroll_zoom_state.screen_to_inner(cursor_position, &bounds);
-        let cursor_tick = inner_cursor.x as i32;
-        let cursor_note = Pitch::new(-(12.0 * inner_cursor.y).round() as i32, 12);
 
         let notes = self.notes.lock().unwrap();
 
-        self.update_hover(layout, cursor_position, bounds, &notes);
+        if self.mouse_enabled {
+            let inner_cursor = self.scroll_zoom_state.screen_to_inner(cursor_position, &bounds);
+            self.state.update_cursor(
+                Cursor::new( inner_cursor.x as i32, Pitch::new(-(12.0 * inner_cursor.y).round() as i32, 12)),
+                messages,
+                &notes,
+                self.settings,
+            );
+            self.update_hover(layout, cursor_position, bounds, &notes);
+        }
+
+        let cursor_tick = self.state.cursor.tick;
+        let cursor_note = self.state.cursor.pitch.clone();
+
+
 
         match event {
             Event::Mouse(mouse_event) => match mouse_event {
                 mouse::Event::CursorMoved { .. } => {
-                    match &self.state.action {
-                        Dragging(note_id, drag_offset) => {
-                            if let Some(note) = notes.get(*note_id) {
-                                let quantize_offset = note.tick - self.settings.tick_grid.quantize_tick(note.tick);
-                                let mut tick = max(0, cursor_tick - drag_offset);
-                                if !self.state.modifiers.alt {
-                                    tick = self.settings.tick_grid.quantize_tick(tick - quantize_offset) + quantize_offset;
-                                }
-
-                                let mut selected_notes: Vec<(NoteId, &Note)> = self.state.selection.iter()
-                                    .filter_map(|id| notes.get(*id).map(|note| (*id, note)))
-                                    .collect();
-
-                                if selected_notes.is_empty() {
-                                    selected_notes.push((*note_id, &note))
-                                }
-
-                                let min_tick = selected_notes.iter().map(|(_, note)| note.tick).min().unwrap();
-
-                                let min_note = selected_notes.iter().map(|(_, note)| note.pitch.clone()).min().unwrap();
-                                let max_note = selected_notes.iter().map(|(_, note)| note.pitch.clone()).max().unwrap();
-
-                                let tick_offset = max(-min_tick, tick - note.tick);
-                                // arbitrary max note
-                                let note_offset = (cursor_note - note.pitch.clone()).clamp(Pitch::new(-4, 1) - min_note, Pitch::new(4, 1) - max_note);
-
-                                // todo: optional mode for irregular grids?
-                                for (note_id, note) in selected_notes {
-                                    let new_note = Note {
-                                        tick: note.tick + tick_offset,
-                                        pitch: note.pitch.clone() + note_offset.clone(),
-                                        ..*note
-                                    };
-
-                                    if note != &new_note {
-                                        messages.push( (self.on_change)(Update(note_id, new_note.clone())));
-                                    }
-                                    if &note.pitch != &new_note.pitch {
-                                        messages.push((self.on_synth_command)(SynthCommand::StartPreview(new_note.pitch.clone())));
-                                    }
-                                }
-                            }
-                        },
-                        Resizing(note_id, drag_offset) => {
-                            if let Some(note) = notes.get(*note_id) {
-                                let quantize_offset = note.tick + note.length - self.settings.tick_grid.quantize_tick(note.tick + note.length);
-                                let mut tick = cursor_tick - drag_offset;
-                                if !self.state.modifiers.alt {
-                                    tick = self.settings.tick_grid.quantize_tick(tick - quantize_offset) + quantize_offset;
-                                }
-                                let length = tick - note.tick;
-
-                                let mut selected_notes: Vec<(NoteId, &Note)> = self.state.selection.iter()
-                                    .filter_map(|id| notes.get(*id).map(|note| (*id, note)))
-                                    .collect();
-
-                                if selected_notes.is_empty() {
-                                    selected_notes.push((*note_id, &note))
-                                }
-
-                                let mut min_length = selected_notes.iter().map(|(_, note)| note.length).min().unwrap();
-                                if !self.state.modifiers.alt {
-                                    min_length -= self.settings.tick_grid.grid_size(tick);
-                                }
-
-                                let length_offset =  max(-min_length, length - note.length);
-
-                                for (note_id, note) in selected_notes {
-                                    let new_note = Note {
-                                        length: note.length + length_offset,
-                                        ..note.clone()
-                                    };
-
-                                    if note != &new_note {
-                                        messages.push( (self.on_change)(Update(note_id, new_note)));
-                                    }
-                                }
-                            }
-                        },
-                        Action::Deleting => {
-                            self.delete_hovered(messages);
-                        },
-                        Selecting(start_tick, start_note) => {
-                            let from_tick = min(start_tick, &cursor_tick).clone();
-                            let to_tick = max(start_tick, &cursor_tick).clone();
-                            let from_note = min(start_note, &cursor_note).clone();
-                            let to_note = max(start_note, &cursor_note).clone();
-
-                            self.state.selection = notes.iter()
-                                .filter(|(_id, note)| note.tick <= to_tick && note.end_tick() >= from_tick && note.pitch <= to_note && note.pitch >= from_note)
-                                .map(|(id, _note)| id)
-                                .collect();
-                        }
-                        Action::None => { },
-                    }
                 }
                 mouse::Event::ButtonPressed(mouse::Button::Left) => {
                     if self.state.modifiers.control {
                         match self.state.hover {
                             HoverState::OutOfBounds => {}
-                            _ => messages.push((self.on_self_change)(PianoRollMessage::Action(Selecting(cursor_tick, cursor_note))))
+                            _ => messages.push(PianoRollMessage::SelfMessage(PianoRollSelfMessage::Action(Selecting(cursor_tick, cursor_note))))
                         }
                     } else {
                         match self.state.hover {
@@ -568,15 +407,15 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                                             false => self.settings.tick_grid.grid_size(tick),
                                         };
                                         let note = Note { tick, pitch: cursor_note.clone(), length };
-                                        messages.push((self.on_synth_command)(SynthCommand::StartPreview(note.pitch.clone())));
-                                        messages.push( (self.on_change)(Add(note)));
-                                        messages.push((self.on_self_change)(PianoRollMessage::ResizeLastCreatedNote(cursor_tick)));
+                                        messages.push(PianoRollMessage::SynthCommand(SynthCommand::StartPreview(note.pitch.clone())));
+                                        messages.push( PianoRollMessage::SequenceChange(Add(note)));
+                                        messages.push(PianoRollMessage::SelfMessage(PianoRollSelfMessage::ResizeLastCreatedNote(cursor_tick)));
                                     }
-                                    false => { 
+                                    false => {
                                         let note = Note { tick, pitch: cursor_note.clone(), length: 32 };
-                                        messages.push((self.on_synth_command)(SynthCommand::StartPreview(note.pitch.clone())));
-                                        messages.push( (self.on_change)(Add(note)));
-                                        messages.push((self.on_self_change)(PianoRollMessage::DragLastCreatedNote(cursor_tick)));
+                                        messages.push(PianoRollMessage::SynthCommand(SynthCommand::StartPreview(note.pitch.clone())));
+                                        messages.push( PianoRollMessage::SequenceChange(Add(note)));
+                                        messages.push(PianoRollMessage::SelfMessage(PianoRollSelfMessage::DragLastCreatedNote(cursor_tick)));
                                     }
                                 };
 
@@ -584,20 +423,20 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                             },
                             CanDrag(id) => {
                                 if let Some(note) = &notes.get(id) {
-                                    messages.push((self.on_self_change)(PianoRollMessage::Action(Dragging(id, cursor_tick - note.tick))));
-                                    messages.push((self.on_synth_command)(SynthCommand::StartPreview(note.pitch.clone())));
+                                    messages.push(PianoRollMessage::SelfMessage(PianoRollSelfMessage::Action(Dragging(id, cursor_tick - note.tick))));
+                                    messages.push(PianoRollMessage::SynthCommand(SynthCommand::StartPreview(note.pitch.clone())));
                                     if !self.state.selection.contains(&id) {
                                         self.state.selection.clear();
                                     }
                                     if self.state.modifiers.shift {
                                         match self.state.selection.is_empty() {
                                             true => {
-                                                messages.push((self.on_change)(Add((*note).clone())))
+                                                messages.push(PianoRollMessage::SequenceChange(Add((*note).clone())))
                                             },
                                             false => {
                                                 for id in &self.state.selection {
                                                     notes.get(*id).map(|note| {
-                                                        messages.push((self.on_change)(Add(note.clone())))
+                                                        messages.push(PianoRollMessage::SequenceChange(Add(note.clone())))
                                                     });
                                                 }
                                             }
@@ -607,7 +446,7 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                             },
                             CanResize(id) => {
                                 if let Some(note) = &notes.get(id) {
-                                    messages.push((self.on_self_change)(PianoRollMessage::Action(Resizing(id, cursor_tick - note.tick - note.length))));
+                                    messages.push(PianoRollMessage::SelfMessage(PianoRollSelfMessage::Action(Resizing(id, cursor_tick - note.tick - note.length))));
                                     if !self.state.selection.contains(&id) {
                                         self.state.selection.clear();
                                     }
@@ -616,11 +455,11 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
                         }
                     } }
                 mouse::Event::ButtonPressed(mouse::Button::Right) => {
-                    self.delete_hovered(messages);
+                    self.state.delete_hovered(messages);
                 }
                 mouse::Event::ButtonReleased( .. ) => {
-                    messages.push((self.on_self_change)(PianoRollMessage::Action(Action::None)));
-                    messages.push((self.on_synth_command)(SynthCommand::StopPreview));
+                    messages.push(PianoRollMessage::SelfMessage(PianoRollSelfMessage::Action(Action::None)));
+                    messages.push(PianoRollMessage::SynthCommand(SynthCommand::StopPreview));
                 }
                 _ => {}
             }
@@ -635,12 +474,9 @@ impl<'a, Message> Widget<Message, Renderer> for PianoRoll<'a, Message> {
 }
 
 
-impl<'a, Message> Into<Element<'a, Message>>
-for PianoRoll<'a, Message>
-    where
-        Message: 'a,
+impl<'a> Into<Element<'a, PianoRollMessage>> for PianoRoll<'a>
 {
-    fn into(self) -> Element<'a, Message> {
+    fn into(self) -> Element<'a, PianoRollMessage> {
         Element::new(self)
     }
 }

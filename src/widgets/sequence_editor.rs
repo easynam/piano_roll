@@ -1,4 +1,4 @@
-use crate::widgets::piano_roll::{PianoRoll, PianoRollSettings, PianoRollMessage, PianoRollState};
+use crate::widgets::piano_roll::{PianoRoll, PianoRollSettings, PianoRollMessage};
 use crate::widgets::timeline::{Timeline, TimelineState};
 use iced::{Element, Column, Row, Space, Length};
 use crate::widgets::scroll_bar::{Orientation, ScrollZoomBar, ScrollZoomBarState};
@@ -9,6 +9,7 @@ use crate::audio::{PlaybackState, SynthCommand};
 
 use SequenceEditorMessage::SelfMessage;
 use SequenceEditorSelfMessage::{ScrollUpdateX, ScrollUpdateY};
+use crate::widgets::piano_roll::state::{PianoRollState, PianoRollSelfMessage};
 
 pub struct SequenceEditor {
     timeline: TimelineState,
@@ -27,7 +28,7 @@ pub enum SequenceEditorMessage {
 
 #[derive(Debug, Clone)]
 pub enum SequenceEditorSelfMessage {
-    PianoRoll(PianoRollMessage),
+    PianoRoll(PianoRollSelfMessage),
     ScrollUpdateX(ScrollScaleAxisChange),
     ScrollUpdateY(ScrollScaleAxisChange),
 }
@@ -66,16 +67,23 @@ impl SequenceEditor {
                 .height(Length::Shrink)
             )
             .push(Row::new()
-                .push(PianoRoll::new(
-                    &mut self.piano_roll,
-                    &notes,
-                    SequenceEditorMessage::SequenceChange,
-                    |message| SelfMessage(SequenceEditorSelfMessage::PianoRoll(message)),
-                    SequenceEditorMessage::SynthCommand,
-                    &self.scroll_zoom,
-                    &settings,
-                    &playback_state,
-                ))
+                .push(Into::<Element<'a, PianoRollMessage>>::into(
+                    PianoRoll::new(
+                        &mut self.piano_roll,
+                        &notes,
+                        &self.scroll_zoom,
+                        &settings,
+                        &playback_state,
+                        true,
+                    ))
+                    .map(|message| {
+                        match message {
+                            PianoRollMessage::SelfMessage(content) => SequenceEditorMessage::SelfMessage(SequenceEditorSelfMessage::PianoRoll(content)),
+                            PianoRollMessage::SynthCommand(content) => SequenceEditorMessage::SynthCommand(content),
+                            PianoRollMessage::SequenceChange(content) => SequenceEditorMessage::SequenceChange(content),
+                        }
+                    })
+                )
                 .push(ScrollZoomBar::new(
                     &mut self.scroll_bar_y,
                     &self.scroll_zoom.y,
